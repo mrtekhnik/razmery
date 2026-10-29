@@ -75,6 +75,21 @@ header.top h1{font-size:18px;margin:0 6px;flex:1;white-space:nowrap;overflow:hid
 .seg button{flex:1;height:44px;font-weight:600}
 .seg button.on{background:var(--accent);color:#fff}
 #toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#222a33;color:#fff;padding:10px 16px;border-radius:20px;z-index:60;font-size:14px;max-width:90%;text-align:center;pointer-events:none}
+.tool span{white-space:nowrap;font-size:11px}
+#selBar{position:absolute;left:8px;bottom:8px;right:60px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+#selBar .cnt{background:rgba(20,25,32,.8);color:#fff;padding:0 12px;height:40px;border-radius:20px;display:flex;align-items:center;font-size:14px}
+#selBar button{height:40px;padding:0 14px;border-radius:20px;background:rgba(20,25,32,.8);color:#fff;font-size:14px}
+#selBar button.on{background:var(--accent)}
+#updBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom));z-index:55;background:#222a33;color:#fff;border-radius:24px;display:flex;align-items:center;gap:10px;padding:6px 6px 6px 16px;box-shadow:0 6px 20px rgba(0,0,0,.3);font-size:14px;white-space:nowrap}
+#updBar button{background:var(--accent);color:#fff;border-radius:18px;height:36px;padding:0 14px;font-weight:600}
+#bkLine{margin:0 12px 10px;padding:8px 8px 8px 12px;border-radius:10px;background:var(--card);border:1px solid var(--line);font-size:14px;display:flex;align-items:center;gap:10px}
+#bkLine.warn{border-color:#f0b429;background:#fff8e6}
+#bkLine span{flex:1}
+#bkLine button{color:var(--accent);font-weight:600;height:36px;padding:0 8px}
+.radio{display:flex;align-items:flex-start;gap:10px;margin-top:8px;cursor:pointer}
+.radio input{width:22px;height:22px;flex:none;margin:1px 0 0}
+.radio small{display:block;color:var(--muted);font-size:13px}
+.sect{font-weight:600;margin:18px 0 0;padding-top:12px;border-top:1px solid var(--line)}
 #busy{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center}
 #busy span{background:#fff;padding:14px 22px;border-radius:12px}
 </style>
@@ -87,6 +102,7 @@ header.top h1{font-size:18px;margin:0 6px;flex:1;white-space:nowrap;overflow:hid
     <button class="big" id="btnGallery" data-ic="image">Из галереи</button>
     <button class="big alt" id="btnCamera" data-ic="camera">Камера</button>
   </div>
+  <div id="bkLine" class="hidden"><span></span><button id="bkNow">Создать</button></div>
   <div id="projList"></div>
   <div id="emptyMsg" class="empty hidden">Проектов пока нет.<br>Загрузите фото из галереи или сделайте снимок.</div>
 </div>
@@ -102,6 +118,7 @@ header.top h1{font-size:18px;margin:0 6px;flex:1;white-space:nowrap;overflow:hid
   <div id="stage">
     <canvas id="cv"></canvas>
     <div id="hint"></div>
+    <div id="selBar" class="hidden"></div>
     <div id="zoomBox">
       <button id="zIn" data-ic="plus" aria-label="Увеличить"></button>
       <button id="zOut" data-ic="minus" aria-label="Уменьшить"></button>
@@ -112,16 +129,18 @@ header.top h1{font-size:18px;margin:0 6px;flex:1;white-space:nowrap;overflow:hid
     <button class="tool" id="tSelect" data-ic="pointer"><span>Выбор</span></button>
     <button class="tool" id="tDim" data-ic="dim"><span>Размер</span></button>
     <button class="tool" id="tText" data-ic="text"><span>Текст</span></button>
+    <button class="tool" id="tFlip" data-ic="flip"><span>Перевернуть</span></button>
     <button class="tool" id="tDel" data-ic="trash"><span>Удалить</span></button>
-    <button class="tool" id="tStyle" data-ic="style"><span>Вид</span></button>
+    <button class="tool" id="tStyle" data-ic="style"><span>Настройки</span></button>
   </nav>
 </div>
 
 <input type="file" id="fGallery" accept="image/*" hidden>
 <input type="file" id="fCamera" accept="image/*" capture="environment" hidden>
-<input type="file" id="fBackup" accept=".json,application/json" hidden>
+<input type="file" id="fBackup" accept=".json,.txt,application/json,text/plain" hidden>
 <div id="ov" class="hidden"><div id="mbox"></div></div>
 <div id="toast" class="hidden"></div>
+<div id="updBar" class="hidden"><span>Доступна новая версия</span><button id="updBtn">Обновить</button></div>
 <div id="busy" class="hidden"><span>Подождите…</span></div>
 
 <script>
@@ -132,6 +151,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
+const APP_VERSION='1.1',APP_DATE='29.10.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -140,7 +160,7 @@ text:'M5 7V4h14v3M12 4v16M9 20h6',trash:'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-1
 style:'M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3c2.6 0 4.7-2.1 4.7-4.7C22 5.9 17.5 3 12 3zM7.5 11h.01M10.5 7h.01M15.5 7.5h.01',
 plus:'M12 5v14M5 12h14',minus:'M5 12h14',fit:'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
 camera:'M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',image:'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4',
-dots:'M12 5h.01M12 12h.01M12 19h.01',edit:'M4 20h4L19 9l-4-4L4 16zM14 6l4 4'};
+dots:'M12 5h.01M12 12h.01M12 19h.01',flip:'M7 20V4M3 8l4-4 4 4M17 4v16M13 16l4 4 4-4',edit:'M4 20h4L19 9l-4-4L4 16zM14 6l4 4'};
 const ic=n=>`<svg class="i" viewBox="0 0 24 24"${n==='dots'?' style="stroke-width:3.5"':''}><path d="${ICONS[n]}"/></svg>`;
 document.querySelectorAll('[data-ic]').forEach(el=>el.insertAdjacentHTML('afterbegin',ic(el.dataset.ic)));
 
@@ -163,7 +183,10 @@ function dbDelProject(id){const t=db.transaction(['projects','photos'],'readwrit
   t.objectStore('projects').delete(id);t.objectStore('photos').delete(id);return txDone(t);}
 
 /* ---------- настройки ---------- */
-let settings={color:'#e53935',lw:3,fs:36,halo:true};
+let settings={color:'#e53935',lw:3,fs:36,halo:true,placeMode:'click3'};
+let bkInfo={lastExport:0,lastImport:0};
+async function loadBk(){try{const r=await dbGet('meta','backup');if(r&&r.value)bkInfo={...bkInfo,...r.value};}catch(e){}}
+function saveBk(){dbPut('meta',{key:'backup',value:bkInfo}).catch(()=>{});}
 async function loadSettings(){try{const r=await dbGet('meta','settings');if(r&&r.value)settings={...settings,...r.value};}catch(e){}}
 function saveSettings(){dbPut('meta',{key:'settings',value:settings}).catch(()=>{});}
 
@@ -253,11 +276,17 @@ async function makeThumb(im,p,ds){const k=Math.min(1,360/Math.max(p.w,p.h));cons
   return await toBlob(c,'image/jpeg',0.8);}
 
 /* ---------- список проектов ---------- */
+function plural(n,a,b,c){const m10=n%10,m100=n%100;return m10===1&&m100!==11?a:(m10>=2&&m10<=4&&(m100<12||m100>14))?b:c;}
+function daysAgo(t){const d=Math.floor((Date.now()-t)/864e5);return d<=0?'сегодня':d===1?'вчера':`${d} ${plural(d,'день','дня','дней')} назад`;}
+function renderBkLine(count){const el=$('#bkLine');if(!count){el.classList.add('hidden');return;}el.classList.remove('hidden');
+  const t=bkInfo.lastExport,old=!t||Date.now()-t>14*864e5;el.classList.toggle('warn',old);
+  el.querySelector('span').textContent=t?`Последняя копия: ${daysAgo(t)} (${fmtDate(t)})`:'Резервная копия ещё не создавалась';}
+$('#bkNow').onclick=()=>exportBackup();
 let thumbUrls=[];
 async function renderList(){
   const list=$('#projList');thumbUrls.forEach(u=>URL.revokeObjectURL(u));thumbUrls=[];
   const ps=(await dbAll('projects')).sort((a,b)=>b.modified-a.modified);
-  list.innerHTML='';$('#emptyMsg').classList.toggle('hidden',ps.length>0);
+  list.innerHTML='';$('#emptyMsg').classList.toggle('hidden',ps.length>0);renderBkLine(ps.length);
   for(const p of ps){
     const el=document.createElement('div');el.className='proj';
     const th=document.createElement('div');th.className='th';
@@ -288,10 +317,11 @@ async function newProject(file){
   }catch(e){busy(false);alertBox('Не удалось открыть изображение','Формат не поддерживается браузером или файл повреждён. Попробуйте JPG или PNG.');}}
 
 /* ---------- редактор: состояние ---------- */
-let proj=null,img=null,dims=[],sel=null,mode='select',tmpP1=null,pendingDim=null,undoSt=[],redoSt=[],loupe=null;
+let proj=null,img=null,dims=[],selSet=new Set(),multi=false,mode='select',tmpP1=null,tmpP2=null,pendingDim=null,undoSt=[],redoSt=[],loupe=null;
 let view={s:1,tx:0,ty:0},fitS=1,cw=0,ch=0,dpr=1,saveTimer=null,thumbDirty=false;
 const cv=$('#cv'),ctx=cv.getContext('2d');
-const selDim=()=>dims.find(d=>d.id===sel)||null;
+const selList=()=>dims.filter(d=>selSet.has(d.id));
+const selDim=()=>{if(selSet.size!==1)return null;const [id]=selSet;return dims.find(d=>d.id===id)||null;};
 const toImg=p=>({x:(p.x-view.tx)/view.s,y:(p.y-view.ty)/view.s});
 const toScr=(x,y)=>({x:x*view.s+view.tx,y:y*view.s+view.ty});
 const clampImg=p=>({x:clamp(p.x,0,proj.w),y:clamp(p.y,0,proj.h)});
@@ -302,7 +332,7 @@ async function openEditor(id){
   try{const p=await dbGet('projects',id),ph=await dbGet('photos',id);if(!p||!ph)throw new Error('нет данных');
     img=await loadImg(ph.blob);proj=p;dims=clone(p.dims||[]);}
   catch(e){busy(false);img=null;proj=null;toast('Не удалось открыть проект');return;}
-  busy(false);undoSt=[];redoSt=[];sel=null;tmpP1=null;pendingDim=null;loupe=null;thumbDirty=false;
+  busy(false);undoSt=[];redoSt=[];selSet=new Set();multi=false;tmpP1=null;tmpP2=null;pendingDim=null;loupe=null;thumbDirty=false;
   $('#listScreen').classList.add('hidden');$('#editor').classList.remove('hidden');
   history.pushState({ed:1},'');
   cw=0;ch=0;sizeCanvas();fitView();setMode(dims.length?'select':'create');}
@@ -325,17 +355,20 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 window.addEventListener('pagehide',()=>{if(proj)saveNow();});
 
 function pushHistory(before){undoSt.push(before||JSON.stringify(dims));if(undoSt.length>200)undoSt.shift();redoSt=[];}
-function fixSel(){if(sel&&!dims.some(d=>d.id===sel))sel=null;}
+function fixSel(){for(const id of [...selSet])if(!dims.some(d=>d.id===id))selSet.delete(id);}
 function undo(){if(act||!undoSt.length)return;redoSt.push(JSON.stringify(dims));dims=JSON.parse(undoSt.pop());fixSel();changed();}
 function redo(){if(act||!redoSt.length)return;undoSt.push(JSON.stringify(dims));dims=JSON.parse(redoSt.pop());fixSel();changed();}
 $('#edUndo').onclick=undo;$('#edRedo').onclick=redo;
 
-function setMode(m){mode=m;tmpP1=null;pendingDim=null;
+function setMode(m){mode=m;tmpP1=null;tmpP2=null;pendingDim=null;if(m==='create')multi=false;
   $('#tSelect').classList.toggle('on',m==='select');$('#tDim').classList.toggle('on',m==='create');updateUI();render();}
 $('#tSelect').onclick=()=>setMode('select');
 $('#tDim').onclick=()=>setMode('create');
 $('#tText').onclick=()=>editText();
 $('#tDel').onclick=()=>delSel();
+$('#tFlip').onclick=()=>flipSel();
+$('#selBar').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.b;
+  if(k==='m')multi=!multi;else if(k==='a'){multi=true;dims.forEach(d=>selSet.add(d.id));}else if(k==='x'){selSet.clear();multi=false;}updateUI();render();});
 $('#tStyle').onclick=()=>openSettings();
 $('#edExport').onclick=()=>openExport();
 $('#edTitle').onclick=async()=>{if(!proj)return;const v=await askText('Название проекта',proj.name);if(!v||!proj)return;proj.name=v;changed();};
@@ -345,18 +378,27 @@ $('#zFit').onclick=()=>fitView();
 
 function updateUI(){if(!proj)return;
   $('#edUndo').disabled=!undoSt.length;$('#edRedo').disabled=!redoSt.length;
-  const d=selDim();$('#tText').disabled=!d;$('#tDel').disabled=!d;
+  const d=selDim(),n=selSet.size;$('#tText').disabled=!d;$('#tDel').disabled=!n;$('#tFlip').disabled=!n;
   let h;
-  if(mode==='create')h=tmpP1?'Коснитесь второй точки':'Коснитесь первой точки · уточняйте по лупе · 2 пальца — масштаб';
+  if(mode==='create')h=tmpP2?'Коснитесь, где разместить размерную линию':tmpP1?'Коснитесь второй точки':'Коснитесь первой точки · уточняйте по лупе · 2 пальца — масштаб';
+  else if(multi)h='Касайтесь размеров, чтобы добавить или убрать из выбора';
   else h=d?'● — концы размера, ◆ — положение линии · двойное касание — текст':'Коснитесь размера, чтобы выбрать · 1 палец — сдвиг, 2 — масштаб';
+  const bar=$('#selBar');
+  if(mode==='select'&&(n||multi)){bar.classList.remove('hidden');
+    bar.innerHTML=`<span class="cnt">✓ ${n}</span><button data-b="m" class="${multi?'on':''}">Несколько</button><button data-b="a">Все</button><button data-b="x" title="Снять выбор">✕</button>`;}
+  else bar.classList.add('hidden');
   $('#hint').textContent=h;$('#edTitle').textContent=proj.name;}
 
 async function editText(){const d=selDim();if(!d)return;const v=await askDimText(d.text);if(v===null||v===d.text)return;pushHistory();d.text=v;changed();}
-function delSel(){const d=selDim();if(!d)return;pushHistory();dims=dims.filter(x=>x!==d);sel=null;changed();toast('Размер удалён. Можно отменить ↶');}
+function delSel(){const L=selList();if(!L.length)return;pushHistory();dims=dims.filter(x=>!selSet.has(x.id));selSet.clear();multi=false;changed();
+  toast(L.length>1?`Удалено размеров: ${L.length}. Можно отменить ↶`:'Размер удалён. Можно отменить ↶');}
+function flipSel(){const L=selList();if(!L.length)return;pushHistory();L.forEach(d=>{d.off=-d.off;});changed();}
 
 function makeDim(a,b){const base=Math.max(proj.w,proj.h)/1000;
   const d={id:uid(),x1:a.x,y1:a.y,x2:b.x,y2:b.y,off:0,text:'',color:settings.color,lw:settings.lw*base,fs:settings.fs*base,halo:settings.halo};
-  const g=dimGeom(d);if(g){const sg=g.ny>1e-6?-1:(g.ny<-1e-6?1:(g.nx>0?-1:1));d.off=sg*d.fs*1.6;}return d;}
+  const g=dimGeom(d);if(g){const pref=g.ny>1e-6?-1:(g.ny<-1e-6?1:(g.nx>0?-1:1));
+    const fits=sg=>[sg*d.fs*1.6,sg*d.fs*2.9].every(o=>[[d.x1,d.y1],[d.x2,d.y2]].every(([x,y])=>{const px=x+g.nx*o,py=y+g.ny*o;return px>=0&&py>=0&&px<=proj.w&&py<=proj.h;}));
+    const sg=fits(pref)?pref:(fits(-pref)?-pref:pref);d.off=sg*d.fs*1.6;}return d;}
 
 /* ---------- холст ---------- */
 function sizeCanvas(){const st=$('#stage');const w=st.clientWidth,h=st.clientHeight;if(!w||!h)return;
@@ -373,16 +415,17 @@ function draw(){rafId=0;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='#1f242b
   ctx.save();ctx.translate(view.tx,view.ty);ctx.scale(view.s,view.s);ctx.drawImage(img,0,0,proj.w,proj.h);
   for(const d of dims)drawDim(ctx,d);if(pendingDim)drawDim(ctx,pendingDim);ctx.restore();
   drawOverlay();if(loupe)drawLoupe();}
+function offHandle(g){const t=g.L*view.s>140?0.22:0.5;return {x:g.ax+(g.bx-g.ax)*t,y:g.ay+(g.by-g.ay)*t};}
 function handleCircle(p){ctx.beginPath();ctx.arc(p.x,p.y,10,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,.9)';ctx.fill();
   ctx.lineWidth=3;ctx.strokeStyle='#1f6feb';ctx.stroke();ctx.beginPath();ctx.arc(p.x,p.y,2.2,0,Math.PI*2);ctx.fillStyle='#1f6feb';ctx.fill();}
 function handleDiamond(p){const r=11;ctx.beginPath();ctx.moveTo(p.x,p.y-r);ctx.lineTo(p.x+r,p.y);ctx.lineTo(p.x,p.y+r);ctx.lineTo(p.x-r,p.y);ctx.closePath();
   ctx.fillStyle='#1f6feb';ctx.fill();ctx.lineWidth=2.5;ctx.strokeStyle='#fff';ctx.stroke();}
 function drawOverlay(){
-  const d=selDim();
-  if(d){const g=dimGeom(d);if(g){const a=toScr(g.ax,g.ay),b=toScr(g.bx,g.by),p1=toScr(d.x1,d.y1),p2=toScr(d.x2,d.y2),m=toScr(g.mx,g.my);
-    ctx.save();ctx.setLineDash([6,5]);ctx.strokeStyle='#4da3ff';ctx.lineWidth=1.5;ctx.beginPath();
+  const L=selList(),one=L.length===1;
+  for(const d of L){const g=dimGeom(d);if(!g)continue;const a=toScr(g.ax,g.ay),b=toScr(g.bx,g.by),p1=toScr(d.x1,d.y1),p2=toScr(d.x2,d.y2),oh=offHandle(g),m=toScr(oh.x,oh.y);
+    ctx.save();ctx.setLineDash([6,5]);ctx.strokeStyle='#4da3ff';ctx.lineWidth=one?1.5:2.5;ctx.beginPath();
     ctx.moveTo(p1.x,p1.y);ctx.lineTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineTo(p2.x,p2.y);ctx.stroke();ctx.setLineDash([]);
-    handleCircle(p1);handleCircle(p2);handleDiamond(m);ctx.restore();}}
+    if(one){handleCircle(p1);handleCircle(p2);handleDiamond(m);}ctx.restore();}
   if(mode==='create'&&tmpP1){const p=toScr(tmpP1.x,tmpP1.y);ctx.save();
     for(const [col,w] of [['rgba(0,0,0,.7)',4],['#ffeb3b',2]]){ctx.strokeStyle=col;ctx.lineWidth=w;ctx.beginPath();
       ctx.moveTo(p.x-12,p.y);ctx.lineTo(p.x+12,p.y);ctx.moveTo(p.x,p.y-12);ctx.lineTo(p.x,p.y+12);ctx.stroke();}ctx.restore();}}
@@ -409,15 +452,16 @@ function hitDim(p){const q=toImg(p),tol=20/view.s;let best=null,bd=Infinity;
     if(m<tol&&m<bd){bd=m;best=d;}}
   return best;}
 function hitHandle(p){const d=selDim();if(!d)return null;const g=dimGeom(d);if(!g)return null;
-  let best=null,bd=30;for(const [k,x,y] of [['p1',d.x1,d.y1],['p2',d.x2,d.y2],['off',g.mx,g.my]]){const s=toScr(x,y);const dd=Math.hypot(p.x-s.x,p.y-s.y);
+  let best=null,bd=30;const oh=offHandle(g);for(const [k,x,y] of [['p1',d.x1,d.y1],['p2',d.x2,d.y2],['off',oh.x,oh.y]]){const s=toScr(x,y);const dd=Math.hypot(p.x-s.x,p.y-s.y);
     if(dd<bd){bd=dd;best={k,x,y};}}return best;}
 
 /* ---------- жесты ---------- */
 const ptrs=new Map();let act=null,pinch=null,locked=false,lastTap={t:0,id:null};
 function pos(e){const r=cv.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
-function cancelAct(){if(!act)return;if(act.k==='handle')Object.assign(act.d,JSON.parse(act.snap));if(act.k==='place')pendingDim=null;act=null;loupe=null;render();}
+function cancelAct(){if(!act)return;if(act.k==='handle')Object.assign(act.d,JSON.parse(act.snap));if(act.k==='place'&&!tmpP2)pendingDim=null;act=null;loupe=null;render();}
 function placeAt(p){const ip=clampImg(toImg(p));act.ip=ip;if(tmpP1)pendingDim=makeDim(tmpP1,ip);
   loupe=act.touchy?{ix:ip.x,iy:ip.y,sx:p.x,sy:p.y}:null;render();}
+function offsetAt(p){const d=pendingDim;if(!d)return;const ip=toImg(p),g=dimGeom(d);if(g)d.off=(ip.x-d.x1)*g.nx+(ip.y-d.y1)*g.ny;render();}
 function handleMove(p){const ip=toImg(p),x=ip.x+act.gx,y=ip.y+act.gy,d=act.d;
   if(act.h==='off'){const g=dimGeom(d);if(g)d.off=(x-d.x1)*g.nx+(y-d.y1)*g.ny;loupe=null;}
   else{const c=clampImg({x,y});if(act.h==='p1'){d.x1=c.x;d.y1=c.y;}else{d.x2=c.x;d.y2=c.y;}
@@ -435,15 +479,16 @@ cv.addEventListener('pointerdown',e=>{
   if(ptrs.size>2||locked)return;
   const touchy=e.pointerType!=='mouse';
   if(e.pointerType==='mouse'&&e.button!==0){act={k:'pan',last:p};return;}
-  if(mode==='create'){act={k:'place',touchy};placeAt(p);return;}
+  if(mode==='create'){if(tmpP2){act={k:'offset'};offsetAt(p);return;}act={k:'place',touchy};placeAt(p);return;}
   const h=hitHandle(p);
   if(h){const d=selDim(),ip=toImg(p);act={k:'handle',h:h.k,d,snap:JSON.stringify(d),before:JSON.stringify(dims),gx:h.x-ip.x,gy:h.y-ip.y,touchy};handleMove(p);}
-  else act={k:'tap',start:p,last:p};});
+  else act={k:'tap',start:p,last:p,mod:e.ctrlKey||e.shiftKey||e.metaKey};});
 cv.addEventListener('pointermove',e=>{
-  if(!ptrs.has(e.pointerId))return;const p=pos(e);ptrs.set(e.pointerId,p);
+  if(!ptrs.has(e.pointerId)){if(proj&&mode==='create'&&tmpP2&&e.pointerType==='mouse')offsetAt(pos(e));return;}const p=pos(e);ptrs.set(e.pointerId,p);
   if(pinch){if(ptrs.size>=2)movePinch();return;}
   if(!act)return;
   if(act.k==='place')placeAt(p);
+  else if(act.k==='offset')offsetAt(p);
   else if(act.k==='handle')handleMove(p);
   else if(act.k==='tap'&&Math.hypot(p.x-act.start.x,p.y-act.start.y)>8){act.k='pan';act.last=act.start;}
   if(act&&act.k==='pan'){view.tx+=p.x-act.last.x;view.ty+=p.y-act.last.y;act.last=p;render();}});
@@ -455,8 +500,9 @@ function onUp(e){
   if(e.type==='pointercancel'){cancelAct();return;}
   const a=act;act=null;loupe=null;
   if(a.k==='place')finishPlace(a);
+  else if(a.k==='offset')finishOffset();
   else if(a.k==='handle'){if(JSON.stringify(a.d)!==a.snap){pushHistory(a.before);changed();}else render();}
-  else if(a.k==='tap')doTap(a.start);
+  else if(a.k==='tap')doTap(a.start,a.mod);
   else render();}
 cv.addEventListener('pointerup',onUp);cv.addEventListener('pointercancel',onUp);
 cv.addEventListener('wheel',e=>{e.preventDefault();const p=pos(e);zoomAt(Math.exp(-e.deltaY*0.0015),p.x,p.y);},{passive:false});
@@ -467,13 +513,19 @@ async function finishPlace(a){
   if(!tmpP1){tmpP1=ip;pendingDim=null;updateUI();render();return;}
   const s1=toScr(tmpP1.x,tmpP1.y),s2=toScr(ip.x,ip.y);
   if(Math.hypot(s1.x-s2.x,s1.y-s2.y)<6||Math.hypot(tmpP1.x-ip.x,tmpP1.y-ip.y)<1){pendingDim=null;toast('Вторая точка совпадает с первой');render();return;}
-  const d=makeDim(tmpP1,ip);pendingDim=d;tmpP1=null;updateUI();render();
+  const d=makeDim(tmpP1,ip);pendingDim=d;
+  if(settings.placeMode==='click3'){tmpP2=ip;updateUI();render();return;}
+  tmpP1=null;updateUI();render();await commitPending();}
+async function finishOffset(){if(!pendingDim)return;tmpP1=null;tmpP2=null;updateUI();render();await commitPending();}
+async function commitPending(){const d=pendingDim;if(!d)return;
   const v=await askDimText('');pendingDim=null;
   if(v===null||!proj){render();updateUI();return;}
-  d.text=v;pushHistory();dims.push(d);sel=d.id;changed();}
-function doTap(p){const d=hitDim(p),now=Date.now();
-  if(d){if(sel===d.id&&lastTap.id===d.id&&now-lastTap.t<400){lastTap={t:0,id:null};editText();return;}sel=d.id;lastTap={t:now,id:d.id};}
-  else{sel=null;lastTap={t:0,id:null};}
+  d.text=v;pushHistory();dims.push(d);selSet=new Set([d.id]);changed();}
+function doTap(p,mod){const d=hitDim(p),now=Date.now();
+  if(multi||mod){if(d){selSet.has(d.id)?selSet.delete(d.id):selSet.add(d.id);}lastTap={t:0,id:null};}
+  else if(d){const one=selDim();if(one&&one.id===d.id&&lastTap.id===d.id&&now-lastTap.t<400){lastTap={t:0,id:null};editText();return;}
+    selSet=new Set([d.id]);lastTap={t:now,id:d.id};}
+  else{selSet.clear();lastTap={t:0,id:null};}
   updateUI();render();}
 
 document.addEventListener('keydown',e=>{
@@ -481,14 +533,19 @@ document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.code==='KeyZ'){e.preventDefault();e.shiftKey?redo():undo();}
   else if((e.ctrlKey||e.metaKey)&&e.code==='KeyY'){e.preventDefault();redo();}
   else if(e.key==='Delete')delSel();
-  else if(e.key==='Escape'){if(tmpP1){tmpP1=null;pendingDim=null;}else sel=null;updateUI();render();}});
+  else if((e.ctrlKey||e.metaKey)&&e.code==='KeyA'&&mode==='select'){e.preventDefault();dims.forEach(d=>selSet.add(d.id));updateUI();render();}
+  else if(e.key==='Escape'){if(tmpP1||tmpP2){tmpP1=null;tmpP2=null;pendingDim=null;}else{selSet.clear();multi=false;}updateUI();render();}});
 
 /* ---------- оформление ---------- */
 function applyStyle(list){if(!list.length)return;pushHistory();const base=Math.max(proj.w,proj.h)/1000;
   for(const d of list){d.color=settings.color;d.lw=settings.lw*base;d.fs=settings.fs*base;d.halo=settings.halo;}changed();}
 function openSettings(){return modal((box,close)=>{
   const COLORS=['#e53935','#ffd600','#00c853','#2979ff','#ff6d00','#ffffff','#111111'];
-  box.innerHTML=`<h3>Оформление размеров</h3><p class="note">Действует на новые размеры. Уже нанесённые меняются только кнопками применения ниже.</p>
+  box.innerHTML=`<h3>Настройки</h3>
+  <div class="lbl">Положение размерной линии при простановке</div>
+  <label class="radio"><input type="radio" name="pm" value="click3"><span>Третьим касанием<small>После второй точки линия следует за пальцем — коснитесь, где её поставить (как в CAD)</small></span></label>
+  <label class="radio"><input type="radio" name="pm" value="auto"><span>Автоматически<small>Сверху или слева, а если там край фото — с другой стороны. Сразу открывается ввод текста</small></span></label>
+  <div class="sect">Оформление размеров</div><p class="note">Действует на новые размеры. Уже нанесённые меняются только кнопками применения ниже.</p>
   <div class="lbl">Цвет линий и текста</div><div class="sws"></div>
   <div class="lbl">Толщина линий: <b class="lwv"></b></div><input type="range" class="rng lw" min="1" max="12" step="0.5">
   <div class="lbl">Размер шрифта: <b class="fsv"></b></div><input type="range" class="rng fs" min="12" max="100" step="1">
@@ -509,13 +566,14 @@ function openSettings(){return modal((box,close)=>{
     const k=W/1000;x.scale(k,k);x.fillStyle='#c9ccd1';x.fillRect(250,230,500,H/k);
     drawDim(x,{x1:250,y1:230,x2:750,y2:230,off:-120,text:'125 мм',color:settings.color,lw:settings.lw,fs:settings.fs,halo:settings.halo});}
   function upd(rs){if(rs)drawSw();q('.lwv').textContent=settings.lw;q('.fsv').textContent=settings.fs;saveSettings();drawPrev();}
+  box.querySelectorAll('[name=pm]').forEach(r=>{r.checked=r.value===settings.placeMode;r.onchange=()=>{settings.placeMode=r.value;saveSettings();};});
   q('.lw').value=settings.lw;q('.fs').value=settings.fs;q('.halo').checked=settings.halo;
   q('.lw').oninput=e=>{settings.lw=+e.target.value;upd(false);};
   q('.fs').oninput=e=>{settings.fs=+e.target.value;upd(false);};
   q('.halo').onchange=e=>{settings.halo=e.target.checked;upd(false);};
-  if(proj){q('.apply').innerHTML='<button class="btn block a1">Применить к выделенному размеру</button><button class="btn block a2">Применить ко всем размерам проекта</button>';
-    q('.a1').disabled=!selDim();q('.a2').disabled=!dims.length;
-    q('.a1').onclick=()=>{const d=selDim();if(d){applyStyle([d]);toast('Применено к выделенному');}};
+  if(proj){const nSel=selList().length;q('.apply').innerHTML=`<button class="btn block a1">Применить к выделенным (${nSel})</button><button class="btn block a2">Применить ко всем размерам проекта</button>`;
+    q('.a1').disabled=!nSel;q('.a2').disabled=!dims.length;
+    q('.a1').onclick=()=>{const L=selList();if(L.length){applyStyle(L);toast('Применено к выделенным: '+L.length);}};
     q('.a2').onclick=()=>{applyStyle(dims);toast('Применено ко всем размерам');};}
   q('.ok').onclick=()=>close(true);
   requestAnimationFrame(()=>upd(true));});}
@@ -561,9 +619,23 @@ async function exportBackup(){
     for(let i=0;i<ps.length;i++){const {thumb,...rest}=ps[i];const ph=await dbGet('photos',rest.id);if(!ph)continue;
       parts.push((parts.length>1?',':'')+JSON.stringify({...rest,photo:await blobToDataURL(ph.blob)}));}
     parts.push(']}');const d=new Date(),pad=n=>String(n).padStart(2,'0');
-    download(new Blob(parts,{type:'application/json'}),`razmery_backup_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.json`);
-    busy(false);toast(`Резервная копия сохранена: проектов ${ps.length}`);}
+    const name=`razmery_backup_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.json`;
+    const blob=new Blob(parts,{type:'application/json'});busy(false);
+    await backupReady(blob,name,ps.length);}
   catch(e){busy(false);alertBox('Ошибка','Не удалось создать резервную копию.');}}
+function shareableBackup(blob,name){if(!navigator.share||!navigator.canShare)return null;
+  const tries=[new File([blob],name,{type:'application/json'}),new File([blob],name.replace(/\.json$/,'.txt'),{type:'text/plain'})];
+  for(const f of tries){try{if(navigator.canShare({files:[f]}))return f;}catch(e){}}return null;}
+function markExport(){bkInfo.lastExport=Date.now();saveBk();if(!proj)renderList();}
+function backupReady(blob,name,n){const sf=shareableBackup(blob,name);return modal((box,close)=>{
+  box.innerHTML=`<h3>Резервная копия готова</h3><p class="txt">Проектов: ${n}\nРазмер: ${(blob.size/1048576).toFixed(1)} МБ</p>
+  <p class="note">Храните копию не только в телефоне: отправьте её в Google Диск, Telegram или на компьютер.</p>
+  ${sf?'<button class="btn pri block sh">Поделиться…</button>':''}<button class="btn ${sf?'':'pri '}block sv">Сохранить в «Загрузки»</button><button class="btn block ghost cl">Закрыть</button>`;
+  const q=s=>box.querySelector(s);
+  if(q('.sh'))q('.sh').onclick=async()=>{try{await navigator.share({files:[sf],title:'Резервная копия «Размеры на фото»'});markExport();toast('Копия отправлена');}
+    catch(e){if(e.name!=='AbortError')toast('Не удалось поделиться — сохраните файл');}};
+  q('.sv').onclick=()=>{download(blob,name);markExport();toast('Копия сохранена в «Загрузки»');};
+  q('.cl').onclick=()=>close(null);});}
 const isNum=v=>typeof v==='number'&&Number.isFinite(v);
 function validateBackup(o){
   if(!o||o.app!==APP_ID||!Array.isArray(o.projects))throw 'Файл не является резервной копией этого приложения.';
@@ -593,11 +665,11 @@ async function importBackup(file){
   const existing=await dbAll('projects'),exIds=new Set(existing.map(p=>p.id)),exNames=new Set(existing.map(p=>p.name));
   const n=data.projects.length,conf=data.projects.filter(p=>exIds.has(p.id)).length;
   let policy='new';
-  if(conf){policy=await choose('Восстановление',`В копии проектов: ${n}.\nУже есть на устройстве: ${conf}.\nКак поступить с совпадающими?`,
+  if(conf){policy=await choose('Восстановление',`${isNum(data.exported)?'Копия от '+fmtDate(data.exported)+'.\n':''}В копии проектов: ${n}.\nУже есть на устройстве: ${conf}.\nКак поступить с совпадающими?`,
       [{k:'skip',l:'Пропустить совпадающие'},{k:'copy',l:'Добавить как копии'},{k:'replace',l:'Заменить существующие',cls:'dng'}]);
     if(!policy){freeImgs();return;}
     if(policy==='replace'&&!await confirmBox('Заменить проекты?',`Текущие версии ${conf} проект(ов) будут заменены данными из копии.`,'Заменить',true)){freeImgs();return;}}
-  else if(!await confirmBox('Восстановление',`Будет добавлено проектов: ${n}. Существующие проекты не изменятся.`,'Восстановить')){freeImgs();return;}
+  else if(!await confirmBox('Восстановление',`${isNum(data.exported)?'Копия от '+fmtDate(data.exported)+'. ':''}Будет добавлено проектов: ${n}. Существующие проекты не изменятся.`,'Восстановить')){freeImgs();return;}
   busy(true,'Восстановление…');
   try{const uniq=base=>{let nm=base,i=2;while(exNames.has(nm))nm=`${base} (${i++})`;exNames.add(nm);return nm;};
     const items=[];let added=0,replaced=0,skipped=0;
@@ -609,7 +681,7 @@ async function importBackup(file){
       const rec={id,name,created:isNum(p.created)?p.created:now,modified:isNum(p.modified)?p.modified:now,w:p.w,h:p.h,dims:p.dims.map(cleanDim)};
       rec.thumb=await makeThumb(p._im,rec,rec.dims);items.push(['projects',rec],['photos',{id,blob:p._blob}]);}
     if(items.length)await dbPutMany(items);
-    freeImgs();busy(false);renderList();
+    freeImgs();busy(false);bkInfo.lastImport=Date.now();saveBk();renderList();
     alertBox('Готово',`Добавлено: ${added}\nЗаменено: ${replaced}\nПропущено: ${skipped}`);}
   catch(e){freeImgs();busy(false);alertBox('Ошибка','Не удалось записать данные. Существующие проекты не изменены.');}}
 async function showStorage(){
@@ -617,19 +689,38 @@ async function showStorage(){
   try{if(navigator.storage&&navigator.storage.estimate){const e=await navigator.storage.estimate();
     txt+=`\nЗанято: ${(e.usage/1048576).toFixed(1)} МБ из доступных ~${(e.quota/1048576).toFixed(0)} МБ`;}
     if(navigator.storage&&navigator.storage.persisted)txt+=`\nЗащита от автоочистки: ${await navigator.storage.persisted()?'включена':'не предоставлена браузером'}`;}catch(e){}
+  txt+=`\nПоследняя копия: ${bkInfo.lastExport?fmtDate(bkInfo.lastExport):'не создавалась'}\nПоследнее восстановление: ${bkInfo.lastImport?fmtDate(bkInfo.lastImport):'не выполнялось'}`;
   txt+='\n\nДанные хранятся только в этом браузере. Регулярно делайте резервную копию.';
   alertBox('Хранилище',txt);}
 $('#lsMenu').onclick=async()=>{
-  const k=await choose('Меню','',[{k:'bk',l:'Создать резервную копию'},{k:'rs',l:'Восстановить из резервной копии'},{k:'st',l:'Оформление размеров'},{k:'inf',l:'Хранилище'}]);
-  if(k==='bk')exportBackup();else if(k==='rs')$('#fBackup').click();else if(k==='st')openSettings();else if(k==='inf')showStorage();};
+  const k=await choose('Меню',`Версия ${APP_VERSION} от ${APP_DATE}`,[{k:'bk',l:'Создать резервную копию'},{k:'rs',l:'Восстановить из резервной копии'},{k:'st',l:'Настройки'},{k:'inf',l:'Хранилище'},{k:'up',l:'Проверить обновления'}]);
+  if(k==='bk')exportBackup();else if(k==='rs')$('#fBackup').click();else if(k==='st')openSettings();else if(k==='inf')showStorage();else if(k==='up')checkUpdate();};
 
 /* ---------- запуск ---------- */
 (async()=>{
   try{db=await openDB();}catch(e){alertBox('Хранилище недоступно','Браузер не дал доступ к IndexedDB. Проекты не смогут сохраняться.');return;}
-  await loadSettings();renderList();
+  await loadSettings();await loadBk();renderList();
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
 })();
-if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+/* ---------- обновление приложения ---------- */
+let swReg=null;
+const showUpd=()=>$('#updBar').classList.remove('hidden');
+if('serviceWorker' in navigator&&location.protocol.startsWith('http')){
+  const hadCtrl=!!navigator.serviceWorker.controller;let reloading=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!hadCtrl||reloading)return;reloading=true;location.reload();});
+  navigator.serviceWorker.register('sw.js').then(reg=>{swReg=reg;
+    if(reg.waiting&&navigator.serviceWorker.controller)showUpd();
+    reg.addEventListener('updatefound',()=>{const w=reg.installing;if(!w)return;
+      w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller)showUpd();});});
+  }).catch(()=>{});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&swReg)swReg.update().catch(()=>{});});
+}
+async function checkUpdate(){
+  if(!swReg){toast('Обновления доступны только в установленной версии');return;}
+  if(swReg.waiting){showUpd();return;}
+  toast('Проверка…');try{await swReg.update();}catch(e){toast('Нет связи с сервером');return;}
+  setTimeout(()=>{if(swReg.waiting||swReg.installing)showUpd();else toast(`Установлена последняя версия (${APP_VERSION})`);},1500);}
+$('#updBtn').onclick=async()=>{if(proj)await flushAll();const w=swReg&&swReg.waiting;if(w)w.postMessage('SKIP_WAITING');else location.reload();};
 </script>
 </body>
 </html>
