@@ -1,7 +1,7 @@
 // Офлайн-кэш «Размеры на фото».
 // ВАЖНО: при каждом обновлении приложения увеличивать VERSION —
 // по этому изменению телефон узнаёт, что вышла новая версия, и показывает кнопку «Обновить».
-const VERSION = '1.3';
+const VERSION = '1.4';
 const CACHE = 'razmery-' + VERSION;
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable.png'];
 

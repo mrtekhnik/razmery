@@ -95,6 +95,27 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
 .radio input{width:22px;height:22px;flex:none;margin:1px 0 0}
 .radio small{display:block;color:var(--muted);font-size:13px}
 .sect{font-weight:600;margin:18px 0 0;padding-top:12px;border-top:1px solid var(--line)}
+.crumbs{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:10px 12px 0;font-size:14px;color:var(--muted)}
+.crumbs button{color:var(--accent);padding:4px 2px;font-weight:600}
+.chipsRow{display:flex;gap:8px;padding:0 12px 10px;overflow-x:auto;scrollbar-width:none}
+.chipsRow::-webkit-scrollbar{display:none}
+.chipsRow button{flex:none;height:38px;padding:0 14px;border-radius:19px;background:var(--card);border:1px solid var(--line);font-size:14px;font-weight:600;white-space:nowrap}
+.chipsRow button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.proj{position:relative}
+.proj.fold .th{display:flex;align-items:center;justify-content:center;background:#e7eef9;color:var(--accent)}
+.proj.fold .th svg.i{width:56px;height:56px;stroke-width:1.5}
+.proj.sel{outline:3px solid var(--accent);outline-offset:-2px}
+.proj .tick{position:absolute;top:8px;left:8px;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.92);border:2px solid #9aa4b2;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;pointer-events:none}
+.proj.sel .tick{background:var(--accent);border-color:var(--accent)}
+.selMode .proj.fold{opacity:.4;pointer-events:none}
+.selMode #projList{padding-bottom:140px}
+#massBar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--bar);display:flex;flex-wrap:wrap;gap:6px;padding:8px 8px calc(8px + env(safe-area-inset-bottom))}
+#massBar button{flex:1 1 auto;height:44px;padding:0 14px;border-radius:10px;background:rgba(255,255,255,.12);color:#fff;font-size:14px;font-weight:600;white-space:nowrap}
+#massBar button.dng{background:var(--danger)}
+.tree{max-height:55vh;overflow:auto;margin:0 -6px}
+.tree button{display:block;width:100%;text-align:left;padding:11px 8px;border-radius:8px;font-size:16px}
+.tree button:active{background:#eef2f7}
+.tree small{color:var(--muted)}
 #busy{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center}
 #busy span{background:#fff;padding:14px 22px;border-radius:12px}
 </style>
@@ -102,14 +123,17 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
 <body>
 
 <div id="listScreen">
-  <header class="top"><h1>Размеры на фото</h1><button class="ibtn" id="lsMenu" data-ic="dots" aria-label="Меню"></button></header>
-  <div class="newbar">
+  <header class="top"><button class="ibtn hidden" id="lsBack" data-ic="back" aria-label="Назад"></button><h1 id="lsTitle">Размеры на фото</h1><button class="ibtn" id="lsMenu" data-ic="dots" aria-label="Меню"></button></header>
+  <div id="crumbs" class="crumbs hidden"></div>
+  <div class="newbar" id="newBar">
     <button class="big" id="btnGallery" data-ic="image">Из галереи</button>
     <button class="big alt" id="btnCamera" data-ic="camera">Камера</button>
   </div>
+  <div class="chipsRow" id="lsChips"></div>
   <div id="bkLine" class="hidden"><span></span><button id="bkNow">Создать</button></div>
   <div id="projList"></div>
-  <div id="emptyMsg" class="empty hidden">Проектов пока нет.<br>Загрузите фото из галереи или сделайте снимок.</div>
+  <div id="emptyMsg" class="empty hidden"></div>
+  <div id="massBar" class="hidden"></div>
 </div>
 
 <div id="editor" class="hidden">
@@ -156,7 +180,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.3',APP_DATE='29.10.2026';
+const APP_VERSION='1.4',APP_DATE='29.10.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -165,7 +189,7 @@ text:'M5 7V4h14v3M12 4v16M9 20h6',trash:'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-1
 style:'M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3c2.6 0 4.7-2.1 4.7-4.7C22 5.9 17.5 3 12 3zM7.5 11h.01M10.5 7h.01M15.5 7.5h.01',
 plus:'M12 5v14M5 12h14',minus:'M5 12h14',fit:'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
 camera:'M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',image:'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4',
-dots:'M12 5h.01M12 12h.01M12 19h.01',flip:'M7 20V4M3 8l4-4 4 4M17 4v16M13 16l4 4 4-4',note:'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5',pen:'M4 20l4-1 11-11-3-3L5 16zM14 6l3 3',edit:'M4 20h4L19 9l-4-4L4 16zM14 6l4 4'};
+dots:'M12 5h.01M12 12h.01M12 19h.01',folder:'M3 6h6l2 2h10v11H3z',restore:'M4 12a8 8 0 1 0 2.5-5.8M4 4v4h4',flip:'M7 20V4M3 8l4-4 4 4M17 4v16M13 16l4 4 4-4',note:'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5',pen:'M4 20l4-1 11-11-3-3L5 16zM14 6l3 3',edit:'M4 20h4L19 9l-4-4L4 16zM14 6l4 4'};
 const ic=n=>`<svg class="i" viewBox="0 0 24 24"${n==='dots'?' style="stroke-width:3.5"':''}><path d="${ICONS[n]}"/></svg>`;
 document.querySelectorAll('[data-ic]').forEach(el=>el.insertAdjacentHTML('afterbegin',ic(el.dataset.ic)));
 
@@ -184,6 +208,8 @@ const dbAll=s=>reqP(db.transaction(s).objectStore(s).getAll());
 function dbPut(s,v){const t=db.transaction(s,'readwrite');t.objectStore(s).put(v);return txDone(t);}
 function dbPutMany(items){const names=[...new Set(items.map(i=>i[0]))];const t=db.transaction(names,'readwrite');
   items.forEach(([s,v])=>t.objectStore(s).put(v));return txDone(t);}
+function dbDelMany(ids){const t=db.transaction(['projects','photos'],'readwrite');
+  for(const id of ids){t.objectStore('projects').delete(id);t.objectStore('photos').delete(id);}return txDone(t);}
 function dbDelProject(id){const t=db.transaction(['projects','photos'],'readwrite');
   t.objectStore('projects').delete(id);t.objectStore('photos').delete(id);return txDone(t);}
 
@@ -406,28 +432,151 @@ function renderBkLine(count){const el=$('#bkLine');if(!count){el.classList.add('
   el.querySelector('span').textContent=t?`Последняя копия: ${daysAgo(t)} (${fmtDate(t)})`:'Резервная копия ещё не создавалась';}
 $('#bkNow').onclick=()=>exportBackup();
 let thumbUrls=[];
+let folders=[],curFolder=null,trashView=false,navStack=[],selMode=false,selProj=new Set(),lastPs=[];
+const TRASH_DAYS=30;
+async function loadFolders(){try{const r=await dbGet('meta','folders');folders=(r&&Array.isArray(r.value))?r.value:[];}catch(e){folders=[];}}
+const saveFolders=()=>dbPut('meta',{key:'folders',value:folders});
+const fById=id=>id?folders.find(f=>f.id===id)||null:null;
+function fChain(id){const out=[];let f=fById(id),g=0;while(f&&g++<10){out.unshift(f);f=fById(f.parent);}return out;}
+const fDepth=id=>id?fChain(id).length:0;
+function fDesc(id){const out=new Set([id]);let ch=true;while(ch){ch=false;for(const f of folders)if(f.parent&&out.has(f.parent)&&!out.has(f.id)){out.add(f.id);ch=true;}}return out;}
+function applyNav(){const fs=navStack.filter(x=>x!=='trash');trashView=navStack[navStack.length-1]==='trash';
+  curFolder=fs.length?fs[fs.length-1]:null;if(curFolder&&!fById(curFolder))curFolder=null;selMode=false;selProj.clear();renderList();}
+function navPush(x){navStack.push(x);history.pushState({nav:navStack.length},'');applyNav();}
+$('#lsBack').onclick=()=>history.back();
+function mkIconBtn(icon,title,fn){const b=document.createElement('button');b.innerHTML=ic(icon);b.title=title;b.onclick=e=>{e.stopPropagation();fn();};return b;}
+function updateSelUI(){$('#lsTitle').textContent=`Выбрано: ${selProj.size}`;$('#massBar').querySelectorAll('button').forEach(b=>b.disabled=!selProj.size);}
 async function renderList(){
   const list=$('#projList');thumbUrls.forEach(u=>URL.revokeObjectURL(u));thumbUrls=[];
-  const ps=(await dbAll('projects')).sort((a,b)=>b.modified-a.modified);
-  list.innerHTML='';$('#emptyMsg').classList.toggle('hidden',ps.length>0);renderBkLine(ps.length);
-  for(const p of ps){
-    const el=document.createElement('div');el.className='proj';
-    const th=document.createElement('div');th.className='th';
-    if(p.thumb){const u=URL.createObjectURL(p.thumb);thumbUrls.push(u);th.style.backgroundImage=`url("${u}")`;}
-    const info=document.createElement('div');info.className='info';
-    info.innerHTML='<div class="nm"></div><div class="dt"></div><div class="dt"></div><div class="dt"></div>';
-    info.children[0].textContent=p.name;info.children[1].textContent='Создан: '+fmtDate(p.created);
-    info.children[2].textContent='Изменён: '+fmtDate(p.modified);const nd=(p.dims||[]).filter(o=>!o.type||['dim','diam','rad','angle'].includes(o.type)).length,no=(p.dims||[]).length-nd;
-    info.children[3].textContent='Размеров: '+nd+(no?`, пометок: ${no}`:'');
-    if((p.comment||'').trim()){const cm=document.createElement('div');cm.className='cm';cm.textContent='💬 '+p.comment.trim().split('\n')[0];info.appendChild(cm);}
-    th.onclick=info.onclick=()=>openEditor(p.id);
-    const acts=document.createElement('div');acts.className='acts';
-    const bR=document.createElement('button');bR.innerHTML=ic('edit');bR.title='Переименовать';
-    bR.onclick=async()=>{const v=await askText('Название проекта',p.name);if(!v)return;p.name=v;p.modified=Date.now();await dbPut('projects',p);renderList();};
-    const bD=document.createElement('button');bD.innerHTML=ic('trash');bD.title='Удалить';
-    bD.onclick=async()=>{if(!await confirmBox('Удалить проект?',`«${p.name}» будет удалён вместе с фото и размерами. Отменить это нельзя.`,'Удалить',true))return;
-      await dbDelProject(p.id);toast('Проект удалён');renderList();};
-    acts.append(bR,bD);el.append(th,info,acts);list.appendChild(el);}}
+  const all=await dbAll('projects');lastPs=all;const live=all.filter(p=>!p.deleted);
+  $('#listScreen').classList.toggle('selMode',selMode);
+  $('#lsTitle').textContent=selMode?`Выбрано: ${selProj.size}`:trashView?'Корзина':curFolder?fById(curFolder).name:'Размеры на фото';
+  $('#lsBack').classList.toggle('hidden',!(trashView||curFolder)||selMode);
+  const cr=$('#crumbs');
+  if(curFolder&&!trashView){cr.classList.remove('hidden');cr.innerHTML='';const chain=fChain(curFolder);
+    const mk=(label,depth)=>{const b=document.createElement('button');b.textContent=label;b.onclick=()=>{const k=depth-navStack.length;if(k<0)history.go(k);};return b;};
+    cr.appendChild(mk('Все проекты',0));
+    chain.forEach((f,i)=>{cr.append(' › ');if(i<chain.length-1)cr.appendChild(mk(f.name,i+1));else{const b=document.createElement('b');b.textContent=f.name;cr.appendChild(b);}});}
+  else cr.classList.add('hidden');
+  $('#newBar').classList.toggle('hidden',trashView||selMode);
+  const ch=$('#lsChips');ch.innerHTML='';
+  const chip=(l,fn,cls)=>{const b=document.createElement('button');b.textContent=l;if(cls)b.className=cls;b.onclick=fn;ch.appendChild(b);return b;};
+  const inTrash=all.filter(p=>p.deleted);
+  if(trashView){chip('Восстановить все',restoreAll).disabled=!inTrash.length;chip('Очистить корзину',emptyTrash).disabled=!inTrash.length;}
+  else if(selMode){const here=live.filter(p=>(p.folderId||null)===curFolder);
+    chip('Выбрать все',()=>{here.forEach(p=>selProj.add(p.id));renderList();});chip('Снять выбор',()=>{selProj.clear();renderList();});
+    chip('Готово',()=>{selMode=false;selProj.clear();renderList();},'on');}
+  else{chip('＋ Папка',newFolder).disabled=fDepth(curFolder)>=3;chip('Выбрать',()=>{selMode=true;selProj.clear();renderList();});
+    if(!curFolder)chip(inTrash.length?`Корзина (${inTrash.length})`:'Корзина',()=>navPush('trash'));}
+  renderBkLine(live.length);if(trashView||selMode)$('#bkLine').classList.add('hidden');
+  list.innerHTML='';let items;
+  if(trashView)items=inTrash.sort((a,b)=>b.deleted-a.deleted);
+  else{items=live.filter(p=>(p.folderId||null)===curFolder).sort((a,b)=>b.modified-a.modified);
+    folders.filter(f=>(f.parent||null)===curFolder).sort((a,b)=>a.name.localeCompare(b.name,'ru')).forEach(f=>list.appendChild(folderCard(f,live)));}
+  for(const p of items)list.appendChild(projCard(p));
+  const em=$('#emptyMsg');em.classList.toggle('hidden',list.children.length>0);
+  em.innerHTML=trashView?`Корзина пуста.<br>Удалённые проекты хранятся здесь ${TRASH_DAYS} дней.`:curFolder?'Папка пуста.<br>Загрузите фото или переместите сюда проекты.':'Проектов пока нет.<br>Загрузите фото из галереи или сделайте снимок.';
+  const mb=$('#massBar');
+  if(selMode){mb.classList.remove('hidden');mb.innerHTML='';
+    [['Переместить',massMove],['Копировать',massCopy],['Экспорт фото',massExport],['Резервная копия',()=>exportBackup(new Set(selProj))],['В корзину',massTrash,'dng']]
+      .forEach(([l,fn,c])=>{const b=document.createElement('button');b.textContent=l;if(c)b.className=c;b.disabled=!selProj.size;b.onclick=fn;mb.appendChild(b);});}
+  else mb.classList.add('hidden');}
+function folderCard(f,live){const el=document.createElement('div');el.className='proj fold';
+  const desc=fDesc(f.id),n=live.filter(p=>desc.has(p.folderId)).length,subs=folders.filter(x=>x.parent===f.id).length;
+  const th=document.createElement('div');th.className='th';th.innerHTML=ic('folder');
+  const info=document.createElement('div');info.className='info';info.innerHTML='<div class="nm"></div><div class="dt"></div>';
+  info.children[0].textContent=f.name;info.children[1].textContent=`Проектов: ${n}`+(subs?` · папок: ${subs}`:'');
+  th.onclick=info.onclick=()=>navPush(f.id);
+  const acts=document.createElement('div');acts.className='acts';
+  acts.append(mkIconBtn('edit','Переименовать',async()=>{const v=await askText('Название папки',f.name);if(!v)return;f.name=v;await saveFolders();renderList();}),
+    mkIconBtn('trash','Удалить',()=>deleteFolder(f)));
+  el.append(th,info,acts);return el;}
+function projCard(p){const el=document.createElement('div');el.className='proj'+(selProj.has(p.id)?' sel':'');
+  const th=document.createElement('div');th.className='th';
+  if(p.thumb){const u=URL.createObjectURL(p.thumb);thumbUrls.push(u);th.style.backgroundImage=`url("${u}")`;}
+  const info=document.createElement('div');info.className='info';const line=(t,cls)=>{const d=document.createElement('div');d.className=cls||'dt';d.textContent=t;info.appendChild(d);};
+  line(p.name,'nm');
+  if(trashView){const left=Math.max(0,TRASH_DAYS-Math.floor((Date.now()-p.deleted)/864e5));
+    line('Удалён: '+fmtDate(p.deleted));line(`Удалится через ${left} ${plural(left,'день','дня','дней')}`);
+    const f=fById(p.folderId);if(p.folderId)line(f?'Папка: '+f.name:'Папка удалена — восстановится в «Все проекты»');}
+  else{line('Создан: '+fmtDate(p.created));line('Изменён: '+fmtDate(p.modified));
+    const nd=(p.dims||[]).filter(o=>!o.type||['dim','diam','rad','angle'].includes(o.type)).length,no=(p.dims||[]).length-nd;
+    line('Размеров: '+nd+(no?`, пометок: ${no}`:''));
+    if((p.comment||'').trim())line('💬 '+p.comment.trim().split('\n')[0],'cm');}
+  const acts=document.createElement('div');acts.className='acts';
+  if(selMode){const t=document.createElement('div');t.className='tick';t.textContent=selProj.has(p.id)?'✓':'';el.appendChild(t);
+    el.onclick=()=>{if(selProj.has(p.id))selProj.delete(p.id);else selProj.add(p.id);const on=selProj.has(p.id);el.classList.toggle('sel',on);t.textContent=on?'✓':'';updateSelUI();};}
+  else if(trashView){acts.append(mkIconBtn('restore','Восстановить',()=>restoreProjects([p])),
+    mkIconBtn('trash','Удалить навсегда',async()=>{if(!await confirmBox('Удалить навсегда?',`«${p.name}» будет удалён без возможности восстановления.`,'Удалить',true))return;
+      await dbDelProject(p.id);toast('Удалено навсегда');renderList();}));}
+  else{th.onclick=info.onclick=()=>openEditor(p.id);
+    acts.append(mkIconBtn('edit','Переименовать',async()=>{const v=await askText('Название проекта',p.name);if(!v)return;p.name=v;p.modified=Date.now();await dbPut('projects',p);renderList();}),
+      mkIconBtn('trash','В корзину',async()=>{if(!await confirmBox('Удалить проект?',`«${p.name}» будет перемещён в корзину. Восстановить можно в течение ${TRASH_DAYS} дней.`,'В корзину',true))return;
+        await toTrash([p]);toast('Перемещено в корзину');renderList();}));}
+  el.append(th,info,acts);return el;}
+const selRecs=()=>lastPs.filter(p=>selProj.has(p.id)&&!p.deleted);
+function putProjects(recs){return recs.length?dbPutMany(recs.map(r=>['projects',r])):Promise.resolve();}
+function toTrash(list){const now=Date.now();return putProjects(list.map(p=>({...p,deleted:now})));}
+async function restoreProjects(list){let lost=0;
+  await putProjects(list.map(p=>{const fid=p.folderId&&fById(p.folderId)?p.folderId:null;if(p.folderId&&!fid)lost++;return {...p,deleted:0,folderId:fid};}));
+  toast(`Восстановлено: ${list.length}`+(lost?` (в «Все проекты»: ${lost})`:''));renderList();}
+function restoreAll(){restoreProjects(lastPs.filter(p=>p.deleted));}
+async function emptyTrash(){const tr=lastPs.filter(p=>p.deleted);if(!tr.length)return;
+  if(!await confirmBox('Очистить корзину?',`Проекты (${tr.length}) будут удалены без возможности восстановления.`,'Очистить',true))return;
+  await dbDelMany(tr.map(p=>p.id));toast('Корзина очищена');renderList();}
+async function purgeTrash(){try{const old=(await dbAll('projects')).filter(p=>p.deleted&&Date.now()-p.deleted>TRASH_DAYS*864e5);if(old.length)await dbDelMany(old.map(p=>p.id));}catch(e){}}
+async function newFolder(){if(fDepth(curFolder)>=3){toast('Можно не больше 3 уровней папок');return;}
+  const v=await askText('Новая папка','',{placeholder:'Название папки'});if(!v)return;
+  folders.push({id:uid(),name:v,parent:curFolder});await saveFolders();renderList();}
+async function deleteFolder(f){const desc=fDesc(f.id),inside=lastPs.filter(p=>!p.deleted&&desc.has(p.folderId));
+  if(!await confirmBox('Удалить папку?',`Папка «${f.name}»${desc.size>1?' вместе с подпапками':''} будет удалена.`+(inside.length?` Проекты внутри (${inside.length}) переместятся в корзину.`:''),'Удалить',true))return;
+  const now=Date.now(),nf=folders.filter(x=>!desc.has(x.id));
+  await dbPutMany([['meta',{key:'folders',value:nf}],...inside.map(p=>['projects',{...p,deleted:now}])]);folders=nf;toast('Папка удалена');renderList();}
+function pickFolder(title){return modal((box,close)=>{
+  box.innerHTML='<h3></h3><div class="tree"></div><div class="mbtns"><button class="btn" data-a="c">Отмена</button></div>';
+  box.querySelector('h3').textContent=title;const tr=box.querySelector('.tree');
+  const add=(id,name,depth)=>{const b=document.createElement('button');b.style.paddingLeft=(8+depth*22)+'px';
+    b.textContent=(id?'📁 ':'🏠 ')+name;if((id||null)===curFolder){const sm=document.createElement('small');sm.textContent=' (текущая)';b.appendChild(sm);}
+    b.onclick=()=>close({id});tr.appendChild(b);};
+  add(null,'Все проекты',0);
+  const walk=(pid,d)=>folders.filter(f=>(f.parent||null)===pid).sort((a,b)=>a.name.localeCompare(b.name,'ru')).forEach(f=>{add(f.id,f.name,d);walk(f.id,d+1);});
+  walk(null,1);box.querySelector('[data-a=c]').onclick=()=>close(null);});}
+const doneSel=()=>{selMode=false;selProj.clear();renderList();};
+async function massMove(){const L=selRecs();if(!L.length)return;const r=await pickFolder(`Переместить (${L.length}) в…`);if(!r)return;
+  await putProjects(L.map(p=>({...p,folderId:r.id})));toast(`Перемещено: ${L.length}`);doneSel();}
+async function massCopy(){const L=selRecs();if(!L.length)return;const r=await pickFolder(`Копировать (${L.length}) в…`);if(!r)return;
+  busy(true,'Копирование…');
+  try{const now=Date.now(),items=[];
+    for(const p of L){const ph=await dbGet('photos',p.id);if(!ph)continue;const id=uid();
+      items.push(['projects',{...p,id,name:(r.id===(p.folderId||null))?p.name+' (копия)':p.name,created:now,modified:now,folderId:r.id,deleted:0,dims:clone(p.dims||[])}],['photos',{id,blob:ph.blob}]);}
+    await dbPutMany(items);busy(false);toast(`Скопировано: ${items.length/2}`);doneSel();}
+  catch(e){busy(false);alertBox('Ошибка','Не удалось скопировать. Возможно, не хватает места.');}}
+async function massTrash(){const L=selRecs();if(!L.length)return;
+  if(!await confirmBox('Переместить в корзину?',`Проектов: ${L.length}. Восстановить можно в течение ${TRASH_DAYS} дней.`,'В корзину',true))return;
+  await toTrash(L);toast(`В корзине: ${L.length}`);doneSel();}
+async function massExport(){const L=selRecs();if(!L.length)return;
+  const fmt=await modal((box,close)=>{let f='jpg';
+    box.innerHTML=`<h3>Экспорт изображений</h3><p class="txt">Проектов: ${L.length}</p><div class="seg"><button data-f="jpg" class="on">JPG</button><button data-f="png">PNG</button></div>
+    <p class="note">Комментарий добавляется к тем проектам, где включено «печатать на экспортируемом изображении». Исходные фото не меняются.</p>
+    <div class="mbtns"><button class="btn" data-a="c">Отмена</button><button class="btn pri" data-a="ok">Подготовить</button></div>`;
+    box.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{f=b.dataset.f;box.querySelectorAll('.seg button').forEach(x=>x.classList.toggle('on',x===b));});
+    box.querySelector('[data-a=c]').onclick=()=>close(null);box.querySelector('[data-a=ok]').onclick=()=>close(f);});
+  if(!fmt)return;const files=[],used=new Set();
+  try{for(let i=0;i<L.length;i++){busy(true,`Подготовка ${i+1} из ${L.length}…`);const p=L[i],ph=await dbGet('photos',p.id);if(!ph)continue;
+      const im=await loadImg(ph.blob);
+      try{const r=await renderExport(fmt,!!p.commentOnExport,p,im,p.dims||[]);let base=safeName(p.name)+'_размеры',nm=base,k=2;
+        while(used.has(nm))nm=`${base} (${k++})`;used.add(nm);files.push(new File([r.blob],nm+'.'+fmt,{type:r.blob.type}));}
+      finally{URL.revokeObjectURL(im.src);}}}
+  catch(e){busy(false);alertBox('Ошибка','Не удалось подготовить изображения (не хватает памяти?).');return;}
+  busy(false);let canSh=false;try{canSh=!!(navigator.share&&navigator.canShare&&navigator.canShare({files}));}catch(e){}
+  await modal((box,close)=>{const mb=files.reduce((a,f)=>a+f.size,0)/1048576;
+    box.innerHTML=`<h3>Изображения готовы</h3><p class="txt">Файлов: ${files.length}\nРазмер: ${mb.toFixed(1)} МБ</p>
+    ${canSh?'<button class="btn pri block sh">Поделиться…</button>':''}<button class="btn ${canSh?'':'pri '}block sv">Сохранить на устройство</button><button class="btn block ghost cl">Закрыть</button>`;
+    const q=s=>box.querySelector(s);
+    if(q('.sh'))q('.sh').onclick=async()=>{try{await navigator.share({files});toast('Отправлено');}catch(e){if(e.name!=='AbortError')toast('Не удалось поделиться — сохраните файлы');}};
+    q('.sv').onclick=async()=>{for(const f of files){download(f,f.name);await new Promise(r=>setTimeout(r,400));}toast(`Сохранено файлов: ${files.length}`);};
+    q('.cl').onclick=()=>close(null);});
+  doneSel();}
 
 $('#btnGallery').onclick=()=>$('#fGallery').click();
 $('#btnCamera').onclick=()=>$('#fCamera').click();
@@ -436,7 +585,7 @@ async function newProject(file){
   busy(true,'Загрузка фото…');
   try{const blob=file.slice(0,file.size,file.type||'image/jpeg');const im=await loadImg(blob);
     const w=im.naturalWidth,h=im.naturalHeight;if(!w||!h)throw new Error('size');
-    const now=Date.now(),id=uid();const p={id,name:'Фото '+fmtDate(now),created:now,modified:now,w,h,dims:[]};
+    const now=Date.now(),id=uid();const p={id,name:'Фото '+fmtDate(now),created:now,modified:now,w,h,dims:[],folderId:curFolder};
     p.thumb=await makeThumb(im,p,[]);URL.revokeObjectURL(im.src);
     await dbPutMany([['projects',p],['photos',{id,blob}]]);busy(false);openEditor(id);
   }catch(e){busy(false);alertBox('Не удалось открыть изображение','Формат не поддерживается браузером или файл повреждён. Попробуйте JPG или PNG.');}}
@@ -468,9 +617,10 @@ async function closeEditor(){
   URL.revokeObjectURL(img.src);img=null;proj=null;dims=[];
   $('#editor').classList.add('hidden');$('#listScreen').classList.remove('hidden');renderList();}
 $('#edBack').onclick=()=>history.back();
-window.addEventListener('popstate',()=>{
-  if(modalClose){modalClose(null);if(proj)history.pushState({ed:1},'');return;}
-  if(proj)closeEditor();});
+window.addEventListener('popstate',e=>{
+  if(modalClose){modalClose(null);if(proj)history.pushState({ed:1},'');else if(navStack.length)history.pushState({nav:navStack.length},'');return;}
+  if(proj){closeEditor();return;}
+  const d=(e.state&&e.state.nav)||0;navStack=navStack.slice(0,d);applyNav();});
 
 function changed(){proj.dims=dims;proj.modified=Date.now();thumbDirty=true;clearTimeout(saveTimer);saveTimer=setTimeout(saveNow,300);updateUI();render();}
 async function saveNow(){clearTimeout(saveTimer);saveTimer=null;if(!proj)return;
@@ -802,17 +952,17 @@ function openSettings(){return modal((box,close)=>{
 function wrapText(c,text,maxW){const out=[];
   for(const para of text.split('\n')){let line='';for(const w of para.split(/\s+/)){const t=line?line+' '+w:w;if(c.measureText(t).width<=maxW||!line)line=t;else{out.push(line);line=w;}}out.push(line);}
   return out;}
-async function renderExport(fmt,withNote){
-  let w=proj.w,h=proj.h,scaled=false;const k=Math.min(1,Math.sqrt(36e6/(w*h)),16000/Math.max(w,h));
+async function renderExport(fmt,withNote,P=proj,IM=img,OBJ=dims){
+  let w=P.w,h=P.h,scaled=false;const k=Math.min(1,Math.sqrt(36e6/(w*h)),16000/Math.max(w,h));
   if(k<1){scaled=true;w=Math.round(w*k);h=Math.round(h*k);}
-  const note=withNote?(proj.comment||'').trim():'';let band=null;
+  const note=withNote?(P.comment||'').trim():'';let band=null;
   const NF=f=>`${f}px system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif`;
   if(note){const fsN=Math.max(14,Math.round(Math.max(w,h)/55)),pad=Math.round(fsN*0.9);mctx.font=NF(fsN);
     const lines=wrapText(mctx,note,w-2*pad),lh=fsN*1.3;band={fsN,pad,lines,lh,h:Math.round(lines.length*lh+2*pad)};}
   const c=document.createElement('canvas');c.width=w;c.height=h+(band?band.h:0);const x=c.getContext('2d');
   x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
-  x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.setTransform(w/proj.w,0,0,h/proj.h,0,0);
-  x.drawImage(img,0,0,proj.w,proj.h);for(const o of dims)drawObj(x,o);
+  x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.setTransform(w/P.w,0,0,h/P.h,0,0);
+  x.drawImage(IM,0,0,P.w,P.h);for(const o of OBJ)drawObj(x,o);
   if(band){x.setTransform(1,0,0,1,0,0);x.fillStyle='#d9dee5';x.fillRect(0,h,w,Math.max(1,Math.round(band.fsN/10)));
     x.fillStyle='#1b2430';x.font=NF(band.fsN);x.textBaseline='top';x.textAlign='left';
     band.lines.forEach((ln,i)=>x.fillText(ln,band.pad,h+band.pad+i*band.lh));}
@@ -843,29 +993,29 @@ async function openExport(){
   gen++;}
 
 /* ---------- резервное копирование ---------- */
-async function exportBackup(){
+async function exportBackup(ids){
   busy(true,'Создание копии…');
-  try{const ps=await dbAll('projects');if(!ps.length){busy(false);toast('Нет проектов для копирования');return;}
-    const parts=[`{"app":"${APP_ID}","version":3,"exported":${Date.now()},"projects":[`];
-    for(let i=0;i<ps.length;i++){const {thumb,...rest}=ps[i];const ph=await dbGet('photos',rest.id);if(!ph)continue;
+  try{const ps=(await dbAll('projects')).filter(p=>!p.deleted&&(!ids||ids.has(p.id)));if(!ps.length){busy(false);toast('Нет проектов для копирования');return;}
+    const parts=[`{"app":"${APP_ID}","version":4,"exported":${Date.now()},"folders":${JSON.stringify(folders)},"projects":[`];
+    for(let i=0;i<ps.length;i++){const {thumb,deleted,...rest}=ps[i];const ph=await dbGet('photos',rest.id);if(!ph)continue;
       parts.push((parts.length>1?',':'')+JSON.stringify({...rest,photo:await blobToDataURL(ph.blob)}));}
     parts.push(']}');const d=new Date(),pad=n=>String(n).padStart(2,'0');
-    const name=`razmery_backup_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.json`;
+    const name=`razmery_backup_${ids?'vybor_':''}${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.json`;
     const blob=new Blob(parts,{type:'application/json'});busy(false);
-    await backupReady(blob,name,ps.length);}
+    await backupReady(blob,name,ps.length,!ids);}
   catch(e){busy(false);alertBox('Ошибка','Не удалось создать резервную копию.');}}
 function shareableBackup(blob,name){if(!navigator.share||!navigator.canShare)return null;
   const tries=[new File([blob],name,{type:'application/json'}),new File([blob],name.replace(/\.json$/,'.txt'),{type:'text/plain'})];
   for(const f of tries){try{if(navigator.canShare({files:[f]}))return f;}catch(e){}}return null;}
 function markExport(){bkInfo.lastExport=Date.now();saveBk();if(!proj)renderList();}
-function backupReady(blob,name,n){const sf=shareableBackup(blob,name);return modal((box,close)=>{
+function backupReady(blob,name,n,full=true){const sf=shareableBackup(blob,name);return modal((box,close)=>{
   box.innerHTML=`<h3>Резервная копия готова</h3><p class="txt">Проектов: ${n}\nРазмер: ${(blob.size/1048576).toFixed(1)} МБ</p>
   <p class="note">Храните копию не только в телефоне: отправьте её в Google Диск, Telegram или на компьютер.</p>
   ${sf?'<button class="btn pri block sh">Поделиться…</button>':''}<button class="btn ${sf?'':'pri '}block sv">Сохранить в «Загрузки»</button><button class="btn block ghost cl">Закрыть</button>`;
   const q=s=>box.querySelector(s);
-  if(q('.sh'))q('.sh').onclick=async()=>{try{await navigator.share({files:[sf],title:'Резервная копия «Размеры на фото»'});markExport();toast('Копия отправлена');}
+  if(q('.sh'))q('.sh').onclick=async()=>{try{await navigator.share({files:[sf],title:'Резервная копия «Размеры на фото»'});if(full)markExport();toast('Копия отправлена');}
     catch(e){if(e.name!=='AbortError')toast('Не удалось поделиться — сохраните файл');}};
-  q('.sv').onclick=()=>{download(blob,name);markExport();toast('Копия сохранена в «Загрузки»');};
+  q('.sv').onclick=()=>{download(blob,name);if(full)markExport();toast('Копия сохранена в «Загрузки»');};
   q('.cl').onclick=()=>close(null);});}
 const isNum=v=>typeof v==='number'&&Number.isFinite(v);
 const OBJ_TYPES=['dim','text','pen','arrow','oval','rect','diam','rad','angle'];
@@ -879,8 +1029,9 @@ function validObj(d){if(!d||typeof d.id!=='string')return false;const t=d.type||
   return ['x1','y1','x2','y2'].every(k=>isNum(d[k]));}
 function validateBackup(o){
   if(!o||o.app!==APP_ID||!Array.isArray(o.projects))throw 'Файл не является резервной копией этого приложения.';
-  if(o.version>3)throw 'Копия создана более новой версией приложения. Обновите приложение.';
+  if(o.version>4)throw 'Копия создана более новой версией приложения. Обновите приложение.';
   if(!o.projects.length)throw 'В копии нет проектов.';
+  if(o.folders!==undefined&&(!Array.isArray(o.folders)||!o.folders.every(f=>f&&typeof f.id==='string'&&typeof f.name==='string')))throw 'Повреждён список папок.';
   const ids=new Set();
   o.projects.forEach((p,i)=>{const w=`Проект №${i+1}`;
     if(!p||typeof p.id!=='string'||!p.id)throw w+': нет идентификатора.';
@@ -905,7 +1056,7 @@ async function importBackup(file){
     await alertBox('Импорт невозможен',typeof e==='string'?e:'Файл повреждён или имеет неверный формат. Данные не изменены.');return;}
   busy(false);
   const freeImgs=()=>data.projects.forEach(p=>p._im&&URL.revokeObjectURL(p._im.src));
-  const existing=await dbAll('projects'),exIds=new Set(existing.map(p=>p.id)),exNames=new Set(existing.map(p=>p.name));
+  const existing=await dbAll('projects'),exIds=new Set(existing.map(p=>p.id)),exNames=new Set(existing.filter(p=>!p.deleted).map(p=>(p.folderId||'')+'|'+p.name));
   const n=data.projects.length,conf=data.projects.filter(p=>exIds.has(p.id)).length;
   let policy='new';
   if(conf){policy=await choose('Восстановление',`${isNum(data.exported)?'Копия от '+fmtDate(data.exported)+'.\n':''}В копии проектов: ${n}.\nУже есть на устройстве: ${conf}.\nКак поступить с совпадающими?`,
@@ -914,16 +1065,19 @@ async function importBackup(file){
     if(policy==='replace'&&!await confirmBox('Заменить проекты?',`Текущие версии ${conf} проект(ов) будут заменены данными из копии.`,'Заменить',true)){freeImgs();return;}}
   else if(!await confirmBox('Восстановление',`${isNum(data.exported)?'Копия от '+fmtDate(data.exported)+'. ':''}Будет добавлено проектов: ${n}. Существующие проекты не изменятся.`,'Восстановить')){freeImgs();return;}
   busy(true,'Восстановление…');
-  try{const uniq=base=>{let nm=base,i=2;while(exNames.has(nm))nm=`${base} (${i++})`;exNames.add(nm);return nm;};
+  try{const uniq=(base,fk)=>{let nm=base,i=2;while(exNames.has(fk+'|'+nm))nm=`${base} (${i++})`;return nm;};
     const items=[];let added=0,replaced=0,skipped=0;
-    for(const p of data.projects){let id=p.id,name=p.name||'Проект';
+    const fIds=new Set(folders.map(f=>f.id)),newF=folders.map(f=>({...f}));
+    for(const f of (data.folders||[]))if(!fIds.has(f.id)){newF.push({id:f.id,name:f.name,parent:typeof f.parent==='string'?f.parent:null});fIds.add(f.id);}
+    newF.forEach(f=>{if(f.parent&&!fIds.has(f.parent))f.parent=null;});
+    for(const p of data.projects){let id=p.id,name=p.name||'Проект';const fk=typeof p.folderId==='string'&&fIds.has(p.folderId)?p.folderId:'';
       if(exIds.has(id)){if(policy==='skip'){skipped++;continue;}
-        if(policy==='copy'){id=uid();name=uniq(name+' (копия)');added++;}else replaced++;}
-      else{if(exNames.has(name))name=uniq(name+' (восстановлен)');else exNames.add(name);added++;}
+        if(policy==='copy'){id=uid();name=uniq(name+' (копия)',fk);added++;}else replaced++;}
+      else{if(exNames.has(fk+'|'+name))name=uniq(name+' (восстановлен)',fk);added++;}
       const now=Date.now();
-      const rec={id,name,created:isNum(p.created)?p.created:now,modified:isNum(p.modified)?p.modified:now,w:p.w,h:p.h,dims:p.dims.map(cleanObj),comment:typeof p.comment==='string'?p.comment:'',commentOnExport:!!p.commentOnExport};
+      const rec={id,name,created:isNum(p.created)?p.created:now,modified:isNum(p.modified)?p.modified:now,w:p.w,h:p.h,dims:p.dims.map(cleanObj),comment:typeof p.comment==='string'?p.comment:'',commentOnExport:!!p.commentOnExport,folderId:typeof p.folderId==='string'&&fIds.has(p.folderId)?p.folderId:null};
       rec.thumb=await makeThumb(p._im,rec,rec.dims);items.push(['projects',rec],['photos',{id,blob:p._blob}]);}
-    if(items.length)await dbPutMany(items);
+    items.push(['meta',{key:'folders',value:newF}]);await dbPutMany(items);folders=newF;
     freeImgs();busy(false);bkInfo.lastImport=Date.now();saveBk();renderList();
     alertBox('Готово',`Добавлено: ${added}\nЗаменено: ${replaced}\nПропущено: ${skipped}`);}
   catch(e){freeImgs();busy(false);alertBox('Ошибка','Не удалось записать данные. Существующие проекты не изменены.');}}
@@ -936,13 +1090,13 @@ async function showStorage(){
   txt+='\n\nДанные хранятся только в этом браузере. Регулярно делайте резервную копию.';
   alertBox('Хранилище',txt);}
 $('#lsMenu').onclick=async()=>{
-  const k=await choose('Меню',`Версия ${APP_VERSION} от ${APP_DATE}`,[{k:'bk',l:'Создать резервную копию'},{k:'rs',l:'Восстановить из резервной копии'},{k:'st',l:'Настройки'},{k:'inf',l:'Хранилище'},{k:'up',l:'Проверить обновления'}]);
-  if(k==='bk')exportBackup();else if(k==='rs')$('#fBackup').click();else if(k==='st')openSettings();else if(k==='inf')showStorage();else if(k==='up')checkUpdate();};
+  const k=await choose('Меню',`Версия ${APP_VERSION} от ${APP_DATE}`,[{k:'bk',l:'Создать резервную копию'},{k:'rs',l:'Восстановить из резервной копии'},{k:'st',l:'Настройки'},{k:'tr',l:'Корзина'},{k:'inf',l:'Хранилище'},{k:'up',l:'Проверить обновления'}]);
+  if(k==='bk')exportBackup();else if(k==='rs')$('#fBackup').click();else if(k==='st')openSettings();else if(k==='inf')showStorage();else if(k==='up')checkUpdate();else if(k==='tr'&&!trashView)navPush('trash');};
 
 /* ---------- запуск ---------- */
 (async()=>{
   try{db=await openDB();}catch(e){alertBox('Хранилище недоступно','Браузер не дал доступ к IndexedDB. Проекты не смогут сохраняться.');return;}
-  await loadSettings();await loadBk();renderList();
+  await loadSettings();await loadBk();await loadFolders();await purgeTrash();renderList();
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
 })();
 /* ---------- обновление приложения ---------- */
