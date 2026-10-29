@@ -127,6 +127,9 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
 .tree button{display:block;width:100%;text-align:left;padding:11px 8px;border-radius:8px;font-size:16px}
 .tree button:active{background:#eef2f7}
 .tree small{color:var(--muted)}
+.inp.sm{height:44px;font-size:15px}
+.row2{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.row2 .btn{flex:1 1 auto}
 .mfoot{margin:14px 0 0;padding-top:12px;border-top:1px solid var(--line);text-align:center;font-size:12px;color:var(--muted);line-height:1.7}
 #busy{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center}
 #busy span{background:#fff;padding:14px 22px;border-radius:12px}
@@ -135,7 +138,7 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
 <body>
 
 <div id="listScreen">
-  <header class="top"><button class="ibtn hidden" id="lsBack" data-ic="back" aria-label="Назад"></button><h1 id="lsTitle">Размеры на фото</h1><button class="ibtn" id="lsMenu" data-ic="dots" aria-label="Меню"></button></header>
+  <header class="top"><button class="ibtn hidden" id="lsBack" data-ic="back" aria-label="Назад"></button><h1 id="lsTitle">Размеры на фото</h1><button class="ibtn" id="lsSync" data-ic="sync" aria-label="Синхронизировать"></button><button class="ibtn" id="lsMenu" data-ic="dots" aria-label="Меню"></button></header>
   <div id="crumbs" class="crumbs hidden"></div>
   <div class="newbar" id="newBar">
     <button class="big" id="btnGallery" data-ic="image">Из галереи</button>
@@ -192,7 +195,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.8.1',APP_DATE='29.10.2026';
+const APP_VERSION='1.9',APP_DATE='29.10.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -201,7 +204,7 @@ text:'M5 7V4h14v3M12 4v16M9 20h6',trash:'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-1
 style:'M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3c2.6 0 4.7-2.1 4.7-4.7C22 5.9 17.5 3 12 3zM7.5 11h.01M10.5 7h.01M15.5 7.5h.01',
 plus:'M12 5v14M5 12h14',minus:'M5 12h14',fit:'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
 camera:'M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',image:'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4',
-dots:'M12 5h.01M12 12h.01M12 19h.01',folder:'M3 6h6l2 2h10v11H3z',restore:'M4 12a8 8 0 1 0 2.5-5.8M4 4v4h4',flip:'M7 20V4M3 8l4-4 4 4M17 4v16M13 16l4 4 4-4',note:'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5',pen:'M4 20l4-1 11-11-3-3L5 16zM14 6l3 3',edit:'M4 20h4L19 9l-4-4L4 16zM14 6l4 4'};
+dots:'M12 5h.01M12 12h.01M12 19h.01',sync:'M20 12a8 8 0 0 1-14 5.3M4 12a8 8 0 0 1 14-5.3M18 3v4h-4M6 21v-4h4',folder:'M3 6h6l2 2h10v11H3z',restore:'M4 12a8 8 0 1 0 2.5-5.8M4 4v4h4',flip:'M7 20V4M3 8l4-4 4 4M17 4v16M13 16l4 4 4-4',note:'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5',pen:'M4 20l4-1 11-11-3-3L5 16zM14 6l3 3',edit:'M4 20h4L19 9l-4-4L4 16zM14 6l4 4'};
 const ic=n=>`<svg class="i" viewBox="0 0 24 24"${n==='dots'?' style="stroke-width:3.5"':''}><path d="${ICONS[n]}"/></svg>`;
 document.querySelectorAll('[data-ic]').forEach(el=>el.insertAdjacentHTML('afterbegin',ic(el.dataset.ic)));
 
@@ -524,7 +527,7 @@ function folderCard(f,live){const el=document.createElement('div');el.className=
   info.children[0].textContent=f.name;info.children[1].textContent=`Проектов: ${n}`+(subs?` · папок: ${subs}`:'');
   th.onclick=info.onclick=()=>navPush(f.id);
   const acts=document.createElement('div');acts.className='acts';
-  acts.append(mkIconBtn('edit','Переименовать',async()=>{const v=await askText('Название папки',f.name);if(!v)return;f.name=v;await saveFolders();renderList();}),
+  acts.append(mkIconBtn('edit','Переименовать',async()=>{const v=await askText('Название папки',f.name);if(!v)return;f.name=v;f.mod=Date.now();await saveFolders();renderList();}),
     mkIconBtn('trash','Удалить',()=>deleteFolder(f)));
   el.append(th,info,acts);return el;}
 function projCard(p){const el=document.createElement('div');el.className='proj'+(selProj.has(p.id)?' sel':'');
@@ -544,14 +547,14 @@ function projCard(p){const el=document.createElement('div');el.className='proj'+
     el.onclick=()=>{if(selProj.has(p.id))selProj.delete(p.id);else selProj.add(p.id);const on=selProj.has(p.id);el.classList.toggle('sel',on);t.textContent=on?'✓':'';updateSelUI();};}
   else if(trashView){acts.append(mkIconBtn('restore','Восстановить',()=>restoreProjects([p])),
     mkIconBtn('trash','Удалить навсегда',async()=>{if(!await confirmBox('Удалить навсегда?',`«${p.name}» будет удалён без возможности восстановления.`,'Удалить',true))return;
-      await dbDelProject(p.id);toast('Удалено навсегда');renderList();}));}
+      await dbDelProject(p.id);await recordPurge([p.id]);toast('Удалено навсегда');renderList();}));}
   else{th.onclick=info.onclick=()=>openEditor(p.id);
     acts.append(mkIconBtn('edit','Переименовать',async()=>{const v=await askText('Название проекта',p.name);if(!v)return;p.name=v;p.modified=Date.now();await dbPut('projects',p);renderList();}),
       mkIconBtn('trash','В корзину',async()=>{if(!await confirmBox('Удалить проект?',`«${p.name}» будет перемещён в корзину. Восстановить можно в течение ${TRASH_DAYS} дней.`,'В корзину',true))return;
         await toTrash([p]);toast('Перемещено в корзину');renderList();}));}
   el.append(th,info,acts);return el;}
 const selRecs=()=>lastPs.filter(p=>selProj.has(p.id)&&!p.deleted);
-function putProjects(recs){return recs.length?dbPutMany(recs.map(r=>['projects',r])):Promise.resolve();}
+function putProjects(recs){const t=Date.now();return recs.length?dbPutMany(recs.map(r=>['projects',{...r,modified:t}])):Promise.resolve();}
 function toTrash(list){const now=Date.now();return putProjects(list.map(p=>({...p,deleted:now})));}
 async function restoreProjects(list){let lost=0;
   await putProjects(list.map(p=>{const fid=p.folderId&&fById(p.folderId)?p.folderId:null;if(p.folderId&&!fid)lost++;return {...p,deleted:0,folderId:fid};}));
@@ -559,15 +562,16 @@ async function restoreProjects(list){let lost=0;
 function restoreAll(){restoreProjects(lastPs.filter(p=>p.deleted));}
 async function emptyTrash(){const tr=lastPs.filter(p=>p.deleted);if(!tr.length)return;
   if(!await confirmBox('Очистить корзину?',`Проекты (${tr.length}) будут удалены без возможности восстановления.`,'Очистить',true))return;
-  await dbDelMany(tr.map(p=>p.id));toast('Корзина очищена');renderList();}
-async function purgeTrash(){try{const old=(await dbAll('projects')).filter(p=>p.deleted&&Date.now()-p.deleted>TRASH_DAYS*864e5);if(old.length)await dbDelMany(old.map(p=>p.id));}catch(e){}}
+  await dbDelMany(tr.map(p=>p.id));await recordPurge(tr.map(p=>p.id));toast('Корзина очищена');renderList();}
+async function purgeTrash(){try{const old=(await dbAll('projects')).filter(p=>p.deleted&&Date.now()-p.deleted>TRASH_DAYS*864e5);if(old.length){await dbDelMany(old.map(p=>p.id));await recordPurge(old.map(p=>p.id));}}catch(e){}}
 async function newFolder(){if(fDepth(curFolder)>=3){toast('Можно не больше 3 уровней папок');return;}
   const v=await askText('Новая папка','',{placeholder:'Название папки'});if(!v)return;
-  folders.push({id:uid(),name:v,parent:curFolder});await saveFolders();renderList();}
+  folders.push({id:uid(),name:v,parent:curFolder,mod:Date.now()});await saveFolders();renderList();}
 async function deleteFolder(f){const desc=fDesc(f.id),inside=lastPs.filter(p=>!p.deleted&&desc.has(p.folderId));
   if(!await confirmBox('Удалить папку?',`Папка «${f.name}»${desc.size>1?' вместе с подпапками':''} будет удалена.`+(inside.length?` Проекты внутри (${inside.length}) переместятся в корзину.`:''),'Удалить',true))return;
   const now=Date.now(),nf=folders.filter(x=>!desc.has(x.id));
-  await dbPutMany([['meta',{key:'folders',value:nf}],...inside.map(p=>['projects',{...p,deleted:now}])]);folders=nf;toast('Папка удалена');renderList();}
+  await dbPutMany([['meta',{key:'folders',value:nf}],...inside.map(p=>['projects',{...p,deleted:now,modified:now}])]);folders=nf;
+  desc.forEach(id=>{folderTomb[id]=now;});await dbPut('meta',{key:'folderTomb',value:folderTomb});toast('Папка удалена');renderList();}
 function pickFolder(title){return modal((box,close)=>{
   box.innerHTML='<h3></h3><div class="tree"></div><div class="mbtns"><button class="btn" data-a="c">Отмена</button></div>';
   box.querySelector('h3').textContent=title;const tr=box.querySelector('.tree');
@@ -973,6 +977,12 @@ function openSettings(){return modal((box,close)=>{
   <canvas class="prev"></canvas>
   <p class="note">Толщина и шрифт задаются относительно размера фото, поэтому на снимках любого разрешения выглядят одинаково.</p>
   <div class="apply"></div>
+  <div class="sect">Синхронизация через GitHub</div>
+  <p class="note">Телефон и компьютер обмениваются проектами через ваш <b>приватный</b> репозиторий, по кнопке ⟳ на главном экране. Подключение общее для всех ваших приложений на mrtekhnik.github.io.</p>
+  <div class="lbl">Репозиторий (имя/репозиторий)</div><input class="inp sm repo" placeholder="mrtekhnik/sync" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <div class="lbl">Токен доступа</div><input class="inp sm tok" type="password" placeholder="github_pat_…" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <div class="row2"><button class="btn sy1">Сохранить и проверить</button><button class="btn ghost sy0">Отключить</button></div>
+  <p class="note sst"></p>
   <div class="mbtns"><button class="btn pri ok">Готово</button></div>`;
   const q=s=>box.querySelector(s),sws=q('.sws'),pc=q('.prev');
   function drawSw(){sws.innerHTML='';const cur=settings.color.toLowerCase();
@@ -996,6 +1006,18 @@ function openSettings(){return modal((box,close)=>{
     q('.a1').disabled=!nSel;q('.a2').disabled=!dims.length;
     q('.a1').onclick=()=>{const L=selList();if(L.length){applyStyle(L);toast('Применено к выделенным: '+L.length);}};
     q('.a2').onclick=()=>{applyStyle(dims);toast('Применено ко всем размерам');};}
+  const cfg0=syncCfg();q('.repo').value=cfg0?cfg0.repo:'';q('.tok').value=cfg0?cfg0.token:'';
+  q('.sst').textContent=cfg0?`Подключено: ${cfg0.repo}`:'Не подключено';
+  q('.sy0').onclick=()=>{setSyncCfg(null);q('.tok').value='';q('.sst').textContent='Отключено. Проекты на устройстве не затронуты.';};
+  q('.sy1').onclick=async()=>{const repo=q('.repo').value.trim().replace(/^https?:\/\/github\.com\//,'').replace(/\/+$/,''),token=q('.tok').value.trim();
+    if(!/^[\w.-]+\/[\w.-]+$/.test(repo)||!token){q('.sst').textContent='Укажите репозиторий в виде имя/репозиторий и токен.';return;}
+    q('.sst').textContent='Проверка…';
+    try{const info=await gh({repo,token},'');
+      if(!info.private){q('.sst').textContent='Репозиторий публичный — фото были бы видны всем. Нужен приватный репозиторий. Настройка не сохранена.';return;}
+      const ref=await gh({repo,token},'/git/ref/heads/main',{allow404:true});
+      if(!ref){q('.sst').textContent='Репозиторий пустой. Создайте его с галочкой «Add a README file».';return;}
+      setSyncCfg({repo,token});q('.sst').textContent=`Подключено: ${repo} (приватный) ✓`;}
+    catch(e){q('.sst').textContent=syncErrText(e);}};
   q('.ok').onclick=()=>close(true);
   requestAnimationFrame(()=>upd(true));});}
 
@@ -1142,14 +1164,115 @@ async function showStorage(){
   txt+='\n\nДанные хранятся только в этом браузере. Регулярно делайте резервную копию.';
   alertBox('Хранилище',txt);}
 $('#lsMenu').onclick=async()=>{
-  const k=await choose('Меню','',[{k:'bk',l:'Создать резервную копию'},{k:'rs',l:'Восстановить из резервной копии'},{k:'st',l:'Настройки'},{k:'tr',l:'Корзина'},{k:'inf',l:'Хранилище'},{k:'up',l:'Проверить обновления'}],
-    `Версия ${APP_VERSION} от ${APP_DATE}<br>Последняя копия: ${bkInfo.lastExport?fmtDate(bkInfo.lastExport):'—'}<br>Последнее восстановление: ${bkInfo.lastImport?fmtDate(bkInfo.lastImport):'—'}`);
-  if(k==='bk')exportBackup();else if(k==='rs')$('#fBackup').click();else if(k==='st')openSettings();else if(k==='inf')showStorage();else if(k==='up')checkUpdate();else if(k==='tr'&&!trashView)navPush('trash');};
+  const k=await choose('Меню','',[{k:'bk',l:'Создать резервную копию'},{k:'rs',l:'Восстановить из резервной копии'},{k:'st',l:'Настройки'},{k:'tr',l:'Корзина'},{k:'inf',l:'Хранилище'},{k:'sy',l:'Синхронизировать'},{k:'up',l:'Проверить обновления'}],
+    `Версия ${APP_VERSION} от ${APP_DATE}<br>Последняя копия: ${bkInfo.lastExport?fmtDate(bkInfo.lastExport):'—'}<br>Последнее восстановление: ${bkInfo.lastImport?fmtDate(bkInfo.lastImport):'—'}<br>Синхронизация: ${syncCfg()?(syncState.lastSync?fmtDate(syncState.lastSync):'ещё не было'):'не настроена'}`);
+  if(k==='bk')exportBackup();else if(k==='rs')$('#fBackup').click();else if(k==='st')openSettings();else if(k==='inf')showStorage();else if(k==='up')checkUpdate();else if(k==='tr'&&!trashView)navPush('trash');else if(k==='sy')syncNow();};
+$('#lsSync').onclick=()=>syncNow();
+
+/* ---------- синхронизация через GitHub ---------- */
+const SYNC_KEY='mrtekhnik.sync',SYNC_DIR='razmery';
+function syncCfg(){try{const v=JSON.parse(localStorage.getItem(SYNC_KEY)||'null');return v&&v.repo&&v.token?v:null;}catch(e){return null;}}
+function setSyncCfg(v){try{if(v)localStorage.setItem(SYNC_KEY,JSON.stringify(v));else localStorage.removeItem(SYNC_KEY);}catch(e){}}
+function apiBase(){try{return localStorage.getItem('mrtekhnik.sync.api')||'https://api.github.com';}catch(e){return 'https://api.github.com';}}
+async function gh(cfg,path,opt={}){
+  const h={Authorization:'Bearer '+cfg.token,Accept:opt.raw?'application/vnd.github.raw':'application/vnd.github+json'};if(opt.body)h['Content-Type']='application/json';
+  const r=await fetch(apiBase()+'/repos/'+cfg.repo+path,{method:opt.method||'GET',cache:'no-store',headers:h,body:opt.body?JSON.stringify(opt.body):undefined});
+  if(opt.allow404&&(r.status===404||r.status===409))return null;
+  if(!r.ok){const e=new Error('HTTP '+r.status);e.status=r.status;try{e.msg=(await r.json()).message;}catch(_){}throw e;}
+  return opt.raw?(opt.blob?r.blob():r.text()):r.json();}
+function syncErrText(e){
+  if(e&&e.code==='empty')return 'Репозиторий пустой. Создайте его с галочкой «Add a README file».';
+  if(e&&e.status===401)return 'GitHub не принял токен: проверьте его или выпустите новый (возможно, истёк срок действия).';
+  if(e&&e.status===403)return 'У токена нет прав на запись. При создании токена нужно право Contents: Read and write.';
+  if(e&&e.status===404)return 'Репозиторий не найден. Проверьте имя (вид: имя/репозиторий) и что токен выдан именно для этого репозитория.';
+  if(e instanceof TypeError)return 'Нет связи с GitHub. Проверьте интернет.';
+  return 'Ошибка: '+((e&&(e.msg||e.message))||e);}
+async function b64OfBlob(b){const u=await blobToDataURL(b);return u.slice(u.indexOf(',')+1);}
+const extOf=t=>t==='image/png'?'png':t==='image/webp'?'webp':'jpg';
+const devName=()=>/Android/i.test(navigator.userAgent)?'Android':/Windows/i.test(navigator.userAgent)?'Windows':'устройство';
+let syncState={known:{},lastSync:0},purged={},folderTomb={},syncing=false;
+async function loadSync(){
+  try{const r=await dbGet('meta','sync');if(r&&r.value)syncState={known:{},lastSync:0,...r.value};}catch(e){}
+  try{const r=await dbGet('meta','purged');purged=(r&&r.value)||{};}catch(e){}
+  try{const r=await dbGet('meta','folderTomb');folderTomb=(r&&r.value)||{};}catch(e){}}
+function recordPurge(ids){const t=Date.now();let n=0;ids.forEach(id=>{if(syncState.known[id]!==undefined){purged[id]=t;n++;}});
+  return n?dbPut('meta',{key:'purged',value:purged}).catch(()=>{}):Promise.resolve();}
+async function syncNow(){
+  const cfg=syncCfg();if(!cfg){toast('Сначала подключите GitHub: Настройки → Синхронизация');openSettings();return;}
+  if(syncing)return;syncing=true;busy(true,'Синхронизация…');
+  try{let res;for(let a=0;a<3;a++){try{res=await syncOnce(cfg);break;}catch(e){if((e.status===422||e.status===409)&&a<2)continue;throw e;}}
+    busy(false);await renderList();
+    const parts=[];if(res.up)parts.push(`отправлено ${res.up}`);if(res.down)parts.push(`получено ${res.down}`);if(res.del)parts.push(`удалено ${res.del}`);if(res.fChanged)parts.push('обновлены папки');
+    if(res.conf)alertBox('Синхронизация завершена',(parts.length?parts.join(', ')+'.\n':'')+`Конфликтов: ${res.conf}. Проект меняли на обоих устройствах: основной осталась более новая версия, другая сохранена копией с пометкой «(другая версия)».`);
+    else toast(parts.length?'Синхронизировано: '+parts.join(', '):'Всё уже синхронизировано');}
+  catch(e){busy(false);alertBox('Синхронизация не удалась',syncErrText(e)+'\n\nДанные на устройстве не изменены.');}
+  finally{syncing=false;}}
+async function syncOnce(cfg){
+  const ref=await gh(cfg,'/git/ref/heads/main',{allow404:true});if(!ref){const e=new Error('empty');e.code='empty';throw e;}
+  const head=ref.object.sha,commit=await gh(cfg,'/git/commits/'+head);
+  const idxTxt=await gh(cfg,`/contents/${SYNC_DIR}/index.json?ref=${head}`,{raw:true,allow404:true});
+  const R=idxTxt?JSON.parse(idxTxt):{};R.v=1;R.projects=R.projects||{};R.purged=R.purged||{};R.folders=R.folders||[];R.folderTomb=R.folderTomb||{};
+  const before=idxTxt?JSON.stringify(JSON.parse(idxTxt)):'';
+  const all=await dbAll('projects'),L=Object.fromEntries(all.map(p=>[p.id,p])),known={...syncState.known};
+  const tree=[],localPut=[],localDel=[];let up=0,down=0,del=0,conf=0;
+  const prog=()=>busy(true,`Синхронизация… ${up+down}`);
+  const blobSha=async b=>(await gh(cfg,'/git/blobs',{method:'POST',body:{content:await b64OfBlob(b),encoding:'base64'}})).sha;
+  const put=async(path,b)=>tree.push({path:`${SYNC_DIR}/${path}`,mode:'100644',type:'blob',sha:await blobSha(b)});
+  const rm=path=>tree.push({path:`${SYNC_DIR}/${path}`,mode:'100644',type:'blob',sha:null});
+  const recJson=p=>{const {thumb,...r}=p;return new Blob([JSON.stringify(r)]);};
+  const push=async(p,pb)=>{const old=R.projects[p.id];await put(`projects/${p.id}.json`,recJson(p));
+    let ph=old&&old.ph,pt=old&&old.pt;
+    if(!ph){const b=pb||((await dbGet('photos',p.id))||{}).blob;if(!b)throw new Error('нет фото у проекта «'+p.name+'»');
+      pt=b.type||'image/jpeg';ph=`photos/${p.id}.${extOf(pt)}`;await put(ph,b);}
+    R.projects[p.id]={m:p.modified,ph,pt};delete R.purged[p.id];known[p.id]=p.modified;up++;prog();};
+  const pullRec=async id=>{const rec=JSON.parse(await gh(cfg,`/contents/${SYNC_DIR}/projects/${id}.json?ref=${head}`,{raw:true}));
+    if(!rec||rec.id!==id||!isNum(rec.w)||!isNum(rec.h)||typeof rec.name!=='string')throw new Error('повреждены данные проекта в репозитории');return rec;};
+  const pullPhoto=async id=>{const e=R.projects[id];const b=await gh(cfg,`/contents/${SYNC_DIR}/${e.ph}?ref=${head}`,{raw:true,blob:true});return new Blob([b],{type:e.pt||'image/jpeg'});};
+  // папки: объединение по времени изменения, удалённые — по «надгробиям»
+  const fm={},addF=f=>{const c=fm[f.id];if(!c||(f.mod||0)>(c.mod||0))fm[f.id]={...f};};
+  folders.forEach(addF);R.folders.forEach(addF);
+  const tomb={...R.folderTomb};for(const [k,v] of Object.entries(folderTomb))tomb[k]=Math.max(tomb[k]||0,v);
+  const merged=Object.values(fm).filter(f=>!(tomb[f.id]&&tomb[f.id]>=(f.mod||0)));
+  const fIds=new Set(merged.map(f=>f.id));
+  const fKey=a=>JSON.stringify(a.map(f=>[f.id,f.name,f.parent||null]).sort()),fChanged=fKey(merged)!==fKey(folders)||fKey(merged)!==fKey(R.folders);merged.forEach(f=>{if(f.parent&&!fIds.has(f.parent))f.parent=null;});
+  R.folders=merged.slice().sort((a,b)=>a.id<b.id?-1:1);R.folderTomb=tomb;
+  // проекты из удалённых папок — в «Все проекты»
+  for(const l of all)if(l.folderId&&!fIds.has(l.folderId)){l.folderId=null;l.modified=Date.now();localPut.push({rec:l,blob:null});}
+  const ids=new Set([...Object.keys(L),...Object.keys(R.projects),...Object.keys(purged),...Object.keys(R.purged)]);
+  for(const id of ids){const l=L[id],r=R.projects[id],b=known[id];
+    if(purged[id]){if(r){rm(`projects/${id}.json`);if(r.ph)rm(r.ph);delete R.projects[id];del++;}R.purged[id]=Math.max(R.purged[id]||0,purged[id]);delete known[id];continue;}
+    if(!r){if(!l)continue;
+      if(R.purged[id]&&b!==undefined&&l.modified===b){localDel.push(id);del++;delete known[id];}else await push(l);continue;}
+    if(!l){const rec=await pullRec(id);localPut.push({rec,blob:await pullPhoto(id)});known[id]=r.m;down++;prog();continue;}
+    if(l.modified===r.m){known[id]=r.m;continue;}
+    const lc=l.modified!==b,rc=r.m!==b;
+    if(lc&&!rc){await push(l);continue;}
+    const rec=await pullRec(id);
+    if(rc&&!lc){localPut.push({rec,blob:null});known[id]=r.m;down++;prog();continue;}
+    conf++;const pb=((await dbGet('photos',id))||{}).blob;const now=Date.now();
+    if(l.modified>r.m){await push(l);const cp={...rec,id:uid(),name:rec.name+' (другая версия)',created:now,modified:now};localPut.push({rec:cp,blob:pb});await push(cp,pb);}
+    else{const cp={...l,id:uid(),name:l.name+' (другая версия)',created:now,modified:now};localPut.push({rec:cp,blob:pb});await push(cp,pb);
+      localPut.push({rec,blob:null});known[id]=r.m;down++;}}
+  const after=JSON.stringify(R);
+  if(tree.length||after!==before){await put('index.json',new Blob([after]));
+    const t=await gh(cfg,'/git/trees',{method:'POST',body:{base_tree:commit.tree.sha,tree}});
+    const c=await gh(cfg,'/git/commits',{method:'POST',body:{message:`Размеры на фото: синхронизация (${devName()})`,tree:t.sha,parents:[head]}});
+    await gh(cfg,'/git/refs/heads/main',{method:'PATCH',body:{sha:c.sha,force:false}});}
+  // применяем полученное на устройстве
+  const items=[];
+  for(const {rec,blob} of localPut){let pb=blob;if(!pb)pb=((await dbGet('photos',rec.id))||{}).blob;if(!pb)continue;
+    const r2={...rec,folderId:rec.folderId&&fIds.has(rec.folderId)?rec.folderId:null,dims:Array.isArray(rec.dims)?rec.dims.filter(validObj).map(cleanObj):[]};
+    const im=await loadImg(pb);try{r2.thumb=await makeThumb(im,r2,r2.dims);}finally{URL.revokeObjectURL(im.src);}
+    items.push(['projects',r2]);if(blob)items.push(['photos',{id:rec.id,blob}]);}
+  items.push(['meta',{key:'folders',value:merged}],['meta',{key:'folderTomb',value:tomb}],['meta',{key:'purged',value:{}}]);
+  await dbPutMany(items);if(localDel.length)await dbDelMany(localDel);
+  folders=merged;folderTomb=tomb;purged={};syncState={known,lastSync:Date.now()};await dbPut('meta',{key:'sync',value:syncState});
+  return {up,down,del,conf,fChanged};}
 
 /* ---------- запуск ---------- */
 (async()=>{
   try{db=await openDB();}catch(e){alertBox('Хранилище недоступно','Браузер не дал доступ к IndexedDB. Проекты не смогут сохраняться.');return;}
-  await loadSettings();await loadBk();await loadFolders();await purgeTrash();renderList();
+  await loadSettings();await loadBk();await loadFolders();await loadSync();await purgeTrash();renderList();
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
 })();
 /* ---------- обновление приложения ---------- */
