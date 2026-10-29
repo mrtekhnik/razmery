@@ -1,7 +1,8 @@
 // Офлайн-кэш «Размеры на фото».
 // ВАЖНО: при каждом обновлении приложения увеличивать VERSION —
 // по этому изменению телефон узнаёт, что вышла новая версия, и показывает кнопку «Обновить».
-const VERSION = '1.8';
+// Удаляются только свои старые кэши (razmery-*): на домене mrtekhnik.github.io живут и другие приложения.
+const VERSION = '1.8.1';
 const CACHE = 'razmery-' + VERSION;
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable.png'];
 
@@ -14,7 +15,7 @@ self.addEventListener('message', e => {
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys()
-    .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+    .then(keys => Promise.all(keys.filter(k => k.startsWith('razmery-') && k !== CACHE).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', e => {
