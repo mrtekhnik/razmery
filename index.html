@@ -195,7 +195,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.9',APP_DATE='29.10.2026';
+const APP_VERSION='1.10',APP_DATE='29.10.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -357,13 +357,32 @@ function measAnchor(o){if(isDim(o)){const g=dimGeom(o);return g?{x:g.mx,y:g.my}:
   return {x:(o.x1+o.x2)/2,y:(o.y1+o.y2)/2};}
 function shelfLayout(o,a){mctx.font=FONT(o.fs);const w=mctx.measureText(o.text).width,pad=o.fs*0.25,S=o.shelf,dir=S.x>=a.x?1:-1;
   return {ax:a.x,ay:a.y,sx:S.x,sy:S.y,ex:S.x+dir*(w+2*pad),tx:S.x+dir*(w/2+pad),ty:S.y-o.lw/2-o.fs*0.12-o.fs/2,w,h:o.fs};}
-function drawShelf(c,o,ax,ay,halo,hc,hw){const L=shelfLayout(o,{x:ax,y:ay});c.save();c.lineJoin='round';c.lineCap='round';
+function lineBase(o){
+  if(isDim(o)){const g=dimGeom(o);if(!g)return null;const sg=o.off>=0?1:-1;return {ax:g.ax,ay:g.ay,bx:g.bx,by:g.by,ux:g.ux,uy:g.uy,L:g.L,nx:g.nx*sg,ny:g.ny*sg};}
+  if(o.type==='diam'||o.type==='rad'){const dx=o.x2-o.x1,dy=o.y2-o.y1,L=Math.hypot(dx,dy);if(L<1e-6)return null;
+    const ux=dx/L,uy=dy/L,ts=o.ts||1;return {ax:o.x1,ay:o.y1,bx:o.x2,by:o.y2,ux,uy,L,nx:-uy*ts,ny:ux*ts};}
+  return null;}
+function lineShelfLayout(o){const b=lineBase(o);if(!b||!o.shelf)return null;mctx.font=FONT(o.fs);
+  const w=mctx.measureText(o.text).width,pad=o.fs*0.3,t=(o.shelf.x-b.ax)*b.ux+(o.shelf.y-b.ay)*b.uy;
+  let ex0,ey0,dir,beyond;if(t>=b.L/2){ex0=b.bx;ey0=b.by;dir=1;beyond=t-b.L;}else{ex0=b.ax;ey0=b.ay;dir=-1;beyond=-t;}
+  const ext=Math.max(beyond,w+2*pad),ux=b.ux*dir,uy=b.uy*dir,k=ext-pad-w/2;
+  const tl=textAlong(o,ex0+ux*k,ey0+uy*k,b.ux,b.uy,b.nx,b.ny,o.lw/2+o.fs*0.15);
+  return {x1:ex0,y1:ey0,x2:ex0+ux*ext,y2:ey0+uy*ext,tl};}
+const useLine=o=>o.shelfLine&&!!lineBase(o);
+function drawShelf(c,o,ax,ay,halo,hc,hw){
+  if(useLine(o)){const LS=lineShelfLayout(o);if(!LS)return;c.save();c.lineCap='round';
+    const lp=()=>{c.beginPath();c.moveTo(LS.x1,LS.y1);c.lineTo(LS.x2,LS.y2);};
+    if(halo){c.strokeStyle=hc;c.lineWidth=o.lw+hw;lp();c.stroke();}c.strokeStyle=o.color;c.lineWidth=o.lw;lp();c.stroke();
+    const t=LS.tl;c.translate(t.cx,t.cy);c.rotate(t.th);c.font=FONT(o.fs);c.textAlign='center';c.textBaseline='middle';
+    if(halo){c.lineWidth=o.fs*0.18;c.strokeStyle=hc;c.strokeText(o.text,0,0);}c.fillStyle=o.color;c.fillText(o.text,0,0);c.restore();return;}const L=shelfLayout(o,{x:ax,y:ay});c.save();c.lineJoin='round';c.lineCap='round';
   const path=()=>{c.beginPath();c.moveTo(L.ax,L.ay);c.lineTo(L.sx,L.sy);c.lineTo(L.ex,L.sy);};
   if(halo){c.strokeStyle=hc;c.lineWidth=o.lw+hw;path();c.stroke();}
   c.strokeStyle=o.color;c.lineWidth=o.lw;path();c.stroke();
   c.font=FONT(o.fs);c.textAlign='center';c.textBaseline='middle';
   if(halo){c.lineWidth=o.fs*0.18;c.strokeStyle=hc;c.strokeText(o.text,L.tx,L.ty);}c.fillStyle=o.color;c.fillText(o.text,L.tx,L.ty);c.restore();}
-function shelfDist(o,q){const a=measAnchor(o);if(!a||!o.shelf||!o.text)return Infinity;const L=shelfLayout(o,a);
+function shelfDist(o,q){if(useLine(o)){const LS=lineShelfLayout(o);if(!LS||!o.text)return Infinity;const t=LS.tl,dx=q.x-t.cx,dy=q.y-t.cy,c=Math.cos(-t.th),sn=Math.sin(-t.th);
+    return Math.min(distSeg(q.x,q.y,LS.x1,LS.y1,LS.x2,LS.y2),Math.hypot(Math.max(0,Math.abs(dx*c-dy*sn)-t.w/2),Math.max(0,Math.abs(dx*sn+dy*c)-t.h/2)));}
+  const a=measAnchor(o);if(!a||!o.shelf||!o.text)return Infinity;const L=shelfLayout(o,a);
   return Math.min(distSeg(q.x,q.y,L.ax,L.ay,L.sx,L.sy),distSeg(q.x,q.y,L.sx,L.sy,L.ex,L.sy),
     Math.hypot(Math.max(0,Math.abs(q.x-L.tx)-L.w/2),Math.max(0,Math.abs(q.y-L.ty)-L.h/2)));}
 const measOf=o=>o.type==='angle'?angleParts(o):measParts(o);
@@ -423,7 +442,9 @@ function drawShape(c,o){const halo=o.halo!==false,hc=haloColor(o.color),hw=Math.
   if(halo){c.strokeStyle=hc;c.lineWidth=o.lw+hw;shapePath(c,o);c.stroke();if(tri){c.lineWidth=hw;tp();c.stroke();}}
   c.strokeStyle=o.color;c.fillStyle=o.color;c.lineWidth=o.lw;shapePath(c,o);c.stroke();if(tri){tp();c.fill();}
   c.restore();}
-function objBounds(o){const b=objBounds0(o);if(!(o.shelf&&isMeas(o)&&o.text))return b;const a=measAnchor(o);if(!a)return b;const L=shelfLayout(o,a);
+function objBounds(o){const b=objBounds0(o);if(!(o.shelf&&isMeas(o)&&o.text))return b;
+  if(useLine(o)){const LS=lineShelfLayout(o);if(!LS)return b;const t=LS.tl,e=Math.max(t.w,t.h)/2;
+    return {x0:Math.min(b.x0,LS.x2,t.cx-e),y0:Math.min(b.y0,LS.y2,t.cy-e),x1:Math.max(b.x1,LS.x2,t.cx+e),y1:Math.max(b.y1,LS.y2,t.cy+e)};}const a=measAnchor(o);if(!a)return b;const L=shelfLayout(o,a);
   return {x0:Math.min(b.x0,L.sx,L.ex),y0:Math.min(b.y0,L.ty-L.h/2),x1:Math.max(b.x1,L.sx,L.ex),y1:Math.max(b.y1,L.sy)};}
 function objBounds0(o){
   if(MEAS.includes(o.type))return measBounds(o);
@@ -715,7 +736,7 @@ function updateUI(){if(!proj)return;
   if(mode==='text')[['plain','Текст'],['leader','С выноской']].forEach(([k,l])=>parts.push(`<button data-l="${k}" class="${labelMode===k?'on':''}">${l}</button>`));
   if(n){if(parts.length)parts.push('<span class="sep"></span>');parts.push(`<span class="cnt">✓ ${n}</span>`);
     if(one&&(isMeas(one)||one.type==='text'))parts.push('<button data-b="e">Изменить</button>');
-    if(one&&isMeas(one)&&one.text)parts.push(`<button data-b="s" class="${one.shelf?'on':''}">Полка</button>`);
+    if(one&&isMeas(one)&&one.text)parts.push(`<button data-b="s" class="${one.shelf?'on':''}">${!one.shelf?'Полка':useLine(one)?'Полка: в линию':'Полка: выноска'}</button>`);
     if(one&&one.type==='angle')parts.push(`<button data-b="g" class="${one.rays===false?'':'on'}">Стороны</button>`);
     if(L.some(isMeas))parts.push('<button data-b="f">Перевернуть</button>');
     parts.push('<button data-b="d">Удалить</button>');}
@@ -737,8 +758,9 @@ async function editComment(){if(!proj)return;
 function delSel(){const L=selList();if(!L.length)return;pushHistory();dims=dims.filter(x=>!selSet.has(x.id));selSet.clear();multi=false;changed();
   toast(L.length>1?`Удалено размеров: ${L.length}. Можно отменить ↶`:'Размер удалён. Можно отменить ↶');}
 function toggleShelf(){const o=selDim();if(!o||!isMeas(o)||!o.text)return;pushHistory();
-  if(o.shelf)delete o.shelf;
-  else{const a=measAnchor(o);if(!a)return;let nx=0,ny=-1;if(isDim(o)){const g=dimGeom(o),sg=o.off>=0?1:-1;nx=g.nx*sg;ny=g.ny*sg;}
+  if(o.shelf&&!o.shelfLine&&lineBase(o)){const b=lineBase(o);o.shelfLine=true;o.shelf={x:b.bx+b.ux*o.fs*3,y:b.by+b.uy*o.fs*3};}
+  else if(o.shelf){delete o.shelf;delete o.shelfLine;}
+  else{delete o.shelfLine;const a=measAnchor(o);if(!a)return;let nx=0,ny=-1;if(isDim(o)){const g=dimGeom(o),sg=o.off>=0?1:-1;nx=g.nx*sg;ny=g.ny*sg;}
     o.shelf={x:a.x+nx*o.fs*2.5+o.fs*1.5,y:a.y+ny*o.fs*2.5-o.fs*0.5};}
   changed();}
 function toggleRays(){const o=selDim();if(!o||o.type!=='angle')return;pushHistory();o.rays=o.rays===false;changed();}
@@ -804,7 +826,7 @@ function drawLoupe(){
 function distSeg(px,py,ax,ay,bx,by){const dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy;const t=l?clamp(((px-ax)*dx+(py-ay)*dy)/l,0,1):0;return Math.hypot(px-ax-t*dx,py-ay-t*dy);}
 function hitObj(p){const q=toImg(p),tol=20/view.s;let best=null,bd=Infinity;
   for(const o of dims){const m=objDist(o,q);if(m<tol&&m<=bd){bd=m;best=o;}}return best;}
-function objHandles(o){const hs=objHandles0(o);if(o.shelf&&isMeas(o))hs.push({k:'sh',x:o.shelf.x,y:o.shelf.y,sq:true});return hs;}
+function objHandles(o){const hs=objHandles0(o);if(o.shelf&&isMeas(o)){const LS=useLine(o)?lineShelfLayout(o):null;hs.push(LS?{k:'sh',x:LS.x2,y:LS.y2,sq:true}:{k:'sh',x:o.shelf.x,y:o.shelf.y,sq:true});}return hs;}
 function objHandles0(o){
   if(isDim(o)){const g=dimGeom(o);if(!g)return [];const oh=offHandle(g);return [{k:'p1',x:o.x1,y:o.y1},{k:'p2',x:o.x2,y:o.y2},{k:'off',x:oh.x,y:oh.y,dia:true}];}
   if(o.type==='text')return o.tip?[{k:'tip',x:o.tip.x,y:o.tip.y}]:[];
@@ -1069,7 +1091,7 @@ async function openExport(){
 async function exportBackup(ids){
   busy(true,'Создание копии…');
   try{const ps=(await dbAll('projects')).filter(p=>!p.deleted&&(!ids||ids.has(p.id)));if(!ps.length){busy(false);toast('Нет проектов для копирования');return;}
-    const parts=[`{"app":"${APP_ID}","version":5,"exported":${Date.now()},"folders":${JSON.stringify(folders)},"projects":[`];
+    const parts=[`{"app":"${APP_ID}","version":6,"exported":${Date.now()},"folders":${JSON.stringify(folders)},"projects":[`];
     for(let i=0;i<ps.length;i++){const {thumb,deleted,...rest}=ps[i];const ph=await dbGet('photos',rest.id);if(!ph)continue;
       parts.push((parts.length>1?',':'')+JSON.stringify({...rest,photo:await blobToDataURL(ph.blob)}));}
     parts.push(']}');const d=new Date(),pad=n=>String(n).padStart(2,'0');
@@ -1102,7 +1124,7 @@ function validObj(d){if(!d||typeof d.id!=='string')return false;if(d.shelf!=null
   return ['x1','y1','x2','y2'].every(k=>isNum(d[k]));}
 function validateBackup(o){
   if(!o||o.app!==APP_ID||!Array.isArray(o.projects))throw 'Файл не является резервной копией этого приложения.';
-  if(o.version>5)throw 'Копия создана более новой версией приложения. Обновите приложение.';
+  if(o.version>6)throw 'Копия создана более новой версией приложения. Обновите приложение.';
   if(!o.projects.length)throw 'В копии нет проектов.';
   if(o.folders!==undefined&&(!Array.isArray(o.folders)||!o.folders.every(f=>f&&typeof f.id==='string'&&typeof f.name==='string')))throw 'Повреждён список папок.';
   const ids=new Set();
@@ -1113,7 +1135,7 @@ function validateBackup(o){
     if(!(isNum(p.w)&&isNum(p.h)&&p.w>0&&p.h>0))throw w+': неверные размеры фото.';
     if(typeof p.photo!=='string'||!/^data:image\/[a-z0-9+.-]+;base64,/i.test(p.photo))throw w+': нет фотографии.';
     if(!Array.isArray(p.dims)||!p.dims.every(validObj))throw w+': повреждены данные разметки.';});}
-function cleanObj(d){const r=cleanObj0(d);if(d.shelf&&isMeas(r))r.shelf={x:d.shelf.x,y:d.shelf.y};if(r.type==='angle'&&d.rays===false)r.rays=false;return r;}
+function cleanObj(d){const r=cleanObj0(d);if(d.shelf&&isMeas(r)){r.shelf={x:d.shelf.x,y:d.shelf.y};if(d.shelfLine===true)r.shelfLine=true;}if(r.type==='angle'&&d.rays===false)r.rays=false;return r;}
 function cleanObj0(d){const t=d.type||'dim',b={id:d.id,color:/^#[0-9a-f]{6}$/i.test(d.color||'')?d.color:'#e53935',lw:d.lw,fs:d.fs,halo:d.halo!==false};
   if(t==='dim')return {...b,x1:d.x1,y1:d.y1,x2:d.x2,y2:d.y2,off:d.off,text:d.text};
   if(t==='text')return {...b,type:'text',x:d.x,y:d.y,text:d.text,tip:d.tip?{x:d.tip.x,y:d.tip.y}:null};
