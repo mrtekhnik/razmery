@@ -156,7 +156,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.2',APP_DATE='29.10.2026';
+const APP_VERSION='1.3',APP_DATE='29.10.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -226,9 +226,9 @@ function askText(title,value,opts={}){return modal((box,close)=>{
   box.querySelector('[data-a=c]').onclick=()=>close(null);
   box.querySelector('[data-a=ok]').onclick=()=>close(inp.value.trim());
   inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&(!opts.multiline||e.ctrlKey||e.metaKey)){e.preventDefault();close(inp.value.trim());}});
-  setTimeout(()=>{inp.focus();inp.select();},50);});}
+  setTimeout(()=>{inp.focus();if(opts.caretEnd){const n=inp.value.length;inp.setSelectionRange(n,n);}else inp.select();},50);});}
 const askLabel=v=>askText('Надпись',v,{multiline:true,placeholder:'Текст надписи (Enter — новая строка)',chips:[['Ø','Ø'],['R','R'],['мм',' мм'],['±','±'],['°','°'],['×','×']]});
-const askDimText=v=>askText('Текст размера',v,{placeholder:'например 25 мм',chips:[['Ø','Ø'],['R','R'],['мм',' мм'],['±','±'],['°','°'],['×','×']]});
+const askDimText=(v,ce)=>askText('Текст размера',v,{caretEnd:ce,placeholder:'например 25 мм',chips:[['Ø','Ø'],['R','R'],['мм',' мм'],['±','±'],['°','°'],['×','×']]});
 function confirmBox(title,text,ok,danger){return modal((box,close)=>{
   box.innerHTML=`<h3></h3><p class="txt"></p><div class="mbtns"><button class="btn" data-a="c">Отмена</button><button class="btn ${danger?'dng':'pri'}" data-a="ok"></button></div>`;
   box.querySelector('h3').textContent=title;box.querySelector('.txt').textContent=text;box.querySelector('[data-a=ok]').textContent=ok||'OK';
@@ -277,7 +277,63 @@ function drawDim(c,d){
     if(halo){c.lineWidth=d.fs*0.18;c.strokeStyle=hc;c.strokeText(d.text,0,0);}c.fillStyle=d.color;c.fillText(d.text,0,0);}
   c.restore();}
 const isDim=o=>!o.type||o.type==='dim';
-function drawObj(c,o){if(isDim(o))return drawDim(c,o);if(o.type==='text')return drawLabel(c,o);return drawShape(c,o);}
+const MEAS=['diam','rad','angle'];
+const isMeas=o=>isDim(o)||MEAS.includes(o.type);
+function drawObj(c,o){if(isDim(o))return drawDim(c,o);if(o.type==='text')return drawLabel(c,o);if(MEAS.includes(o.type))return drawMeas(c,o);return drawShape(c,o);}
+function textAlong(o,mx,my,ux,uy,nx,ny,base){let th=Math.atan2(uy,ux);
+  if(th>=Math.PI/2-1e-6)th-=Math.PI;else if(th<-Math.PI/2-1e-6)th+=Math.PI;
+  const upx=Math.sin(th),upy=-Math.cos(th),side=(upx*nx+upy*ny)>=-1e-6?1:-1;
+  mctx.font=FONT(o.fs);const w=mctx.measureText(o.text).width,h=o.fs,dist=base+h/2;
+  return {th,w,h,cx:mx+upx*side*dist,cy:my+upy*side*dist};}
+function measParts(o){const dx=o.x2-o.x1,dy=o.y2-o.y1,L=Math.hypot(dx,dy);if(L<1e-6)return null;
+  const ux=dx/L,uy=dy/L,ts=o.ts||1,nx=-uy*ts,ny=ux*ts,al=o.fs*0.7,aw=o.fs*0.24,segs=[],tris=[];
+  if(o.type==='diam'){
+    if(L>=al*2.4){segs.push([o.x1,o.y1,o.x2,o.y2]);tris.push(arrowTri(o.x1,o.y1,o.x1+ux*al,o.y1+uy*al,al,aw),arrowTri(o.x2,o.y2,o.x2-ux*al,o.y2-uy*al,al,aw));}
+    else{const e=al*1.8;segs.push([o.x1-ux*e,o.y1-uy*e,o.x2+ux*e,o.y2+uy*e]);tris.push(arrowTri(o.x1,o.y1,o.x1-ux*al,o.y1-uy*al,al,aw),arrowTri(o.x2,o.y2,o.x2+ux*al,o.y2+uy*al,al,aw));}}
+  else{segs.push([o.x1,o.y1,o.x2,o.y2]);tris.push(arrowTri(o.x2,o.y2,o.x2-ux*al,o.y2-uy*al,al,aw));
+    const c=o.fs*0.35;segs.push([o.x1-c,o.y1,o.x1+c,o.y1],[o.x1,o.y1-c,o.x1,o.y1+c]);}
+  const tl=o.text?textAlong(o,(o.x1+o.x2)/2,(o.y1+o.y2)/2,ux,uy,nx,ny,o.lw/2+o.fs*0.15):null;
+  return {segs,tris,tl,arc:null};}
+function angleParts(o){
+  const L1=Math.hypot(o.x1-o.cx,o.y1-o.cy),L2=Math.hypot(o.x2-o.cx,o.y2-o.cy);if(L1<1e-6||L2<1e-6)return null;
+  const a1=Math.atan2(o.y1-o.cy,o.x1-o.cx),a2=Math.atan2(o.y2-o.cy,o.x2-o.cx);
+  let d=a2-a1;while(d>Math.PI)d-=2*Math.PI;while(d<=-Math.PI)d+=2*Math.PI;if(o.rev)d=d>0?d-2*Math.PI:d+2*Math.PI;
+  const r=o.r,al=o.fs*0.7,aw=o.fs*0.24,ext=o.fs*0.35,sg=d>=0?1:-1;
+  const l1=Math.max(L1,r+ext),l2=Math.max(L2,r+ext);
+  const segs=[[o.cx,o.cy,o.cx+Math.cos(a1)*l1,o.cy+Math.sin(a1)*l1],[o.cx,o.cy,o.cx+Math.cos(a2)*l2,o.cy+Math.sin(a2)*l2]];
+  const inside=Math.abs(d)*r>=al*2.4;
+  const mk=(a,dir)=>{const tx=o.cx+Math.cos(a)*r,ty=o.cy+Math.sin(a)*r,vx=-Math.sin(a)*sg,vy=Math.cos(a)*sg,k=dir*(inside?1:-1);
+    return arrowTri(tx,ty,tx+vx*al*k,ty+vy*al*k,al,aw);};
+  const tris=[mk(a1,1),mk(a1+d,-1)];let tl=null;
+  if(o.text){const am=a1+d/2;mctx.font=FONT(o.fs);const w=mctx.measureText(o.text).width,h=o.fs;
+    const rr=r+o.lw/2+o.fs*0.25+Math.abs(Math.cos(am))*w/2+Math.abs(Math.sin(am))*h/2;
+    tl={th:0,w,h,cx:o.cx+Math.cos(am)*rr,cy:o.cy+Math.sin(am)*rr};}
+  return {segs,tris,tl,arc:{r,a1,d}};}
+const measOf=o=>o.type==='angle'?angleParts(o):measParts(o);
+function arcPts(o,A,n=24){const pts=[];for(let i=0;i<=n;i++){const a=A.a1+A.d*i/n;pts.push([o.cx+Math.cos(a)*A.r,o.cy+Math.sin(a)*A.r]);}return pts;}
+function drawMeas(c,o){const P=measOf(o);if(!P)return;
+  const halo=o.halo!==false,hc=haloColor(o.color),hw=Math.max(o.lw*1.6,o.fs*0.08);
+  const pathSegs=()=>{c.beginPath();for(const s of P.segs){c.moveTo(s[0],s[1]);c.lineTo(s[2],s[3]);}
+    if(P.arc){const A=P.arc;c.moveTo(o.cx+Math.cos(A.a1)*A.r,o.cy+Math.sin(A.a1)*A.r);c.arc(o.cx,o.cy,A.r,A.a1,A.a1+A.d,A.d<0);}};
+  const pathTris=()=>{c.beginPath();for(const t of P.tris){c.moveTo(t[0],t[1]);c.lineTo(t[2],t[3]);c.lineTo(t[4],t[5]);c.closePath();}};
+  c.save();c.lineJoin='round';
+  if(halo){c.lineCap='round';c.strokeStyle=hc;c.lineWidth=o.lw+hw;pathSegs();c.stroke();c.lineWidth=hw;pathTris();c.stroke();}
+  c.lineCap='butt';c.strokeStyle=o.color;c.fillStyle=o.color;c.lineWidth=o.lw;pathSegs();c.stroke();pathTris();c.fill();
+  if(P.tl){const t=P.tl;c.translate(t.cx,t.cy);c.rotate(t.th);c.font=FONT(o.fs);c.textAlign='center';c.textBaseline='middle';
+    if(halo){c.lineWidth=o.fs*0.18;c.strokeStyle=hc;c.strokeText(o.text,0,0);}c.fillStyle=o.color;c.fillText(o.text,0,0);}
+  c.restore();}
+function measDist(o,q){const P=measOf(o);if(!P)return Infinity;let m=Infinity;
+  for(const s of P.segs)m=Math.min(m,distSeg(q.x,q.y,s[0],s[1],s[2],s[3]));
+  for(const t of P.tris)m=Math.min(m,Math.hypot(q.x-t[0],q.y-t[1]));
+  if(P.arc){const pts=arcPts(o,P.arc);for(let i=1;i<pts.length;i++)m=Math.min(m,distSeg(q.x,q.y,pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1]));}
+  if(P.tl){const t=P.tl,dx=q.x-t.cx,dy=q.y-t.cy,c=Math.cos(-t.th),sn=Math.sin(-t.th);const lx=dx*c-dy*sn,ly=dx*sn+dy*c;
+    m=Math.min(m,Math.hypot(Math.max(0,Math.abs(lx)-t.w/2),Math.max(0,Math.abs(ly)-t.h/2)));}
+  return m;}
+function measBounds(o){const P=measOf(o),xs=[],ys=[];if(!P)return {x0:o.x1,y0:o.y1,x1:o.x1,y1:o.y1};
+  for(const s of P.segs){xs.push(s[0],s[2]);ys.push(s[1],s[3]);}
+  if(P.arc)arcPts(o,P.arc,12).forEach(p=>{xs.push(p[0]);ys.push(p[1]);});
+  if(P.tl){const t=P.tl,e=Math.max(t.w,t.h)/2;xs.push(t.cx-e,t.cx+e);ys.push(t.cy-e,t.cy+e);}
+  return {x0:Math.min(...xs),y0:Math.min(...ys),x1:Math.max(...xs),y1:Math.max(...ys)};}
 function arrowTri(tx,ty,fx,fy,al,aw){const L=Math.hypot(tx-fx,ty-fy)||1,ux=(tx-fx)/L,uy=(ty-fy)/L,bx=tx-ux*al,by=ty-uy*al;return [tx,ty,bx-uy*aw,by+ux*aw,bx+uy*aw,by-ux*aw];}
 function labelLayout(o){mctx.font=FONT(o.fs);const lines=(o.text||' ').split('\n'),lh=o.fs*1.22;
   const w=Math.max(o.fs*0.6,...lines.map(l=>mctx.measureText(l).width)),h=lh*lines.length,pad=o.fs*0.3;let lead=null;
@@ -310,6 +366,7 @@ function drawShape(c,o){const halo=o.halo!==false,hc=haloColor(o.color),hw=Math.
   c.strokeStyle=o.color;c.fillStyle=o.color;c.lineWidth=o.lw;shapePath(c,o);c.stroke();if(tri){tp();c.fill();}
   c.restore();}
 function objBounds(o){
+  if(MEAS.includes(o.type))return measBounds(o);
   if(o.type==='text'){const L=labelLayout(o);let b={x0:o.x-L.w/2-L.pad,y0:o.y-L.h/2-L.pad,x1:o.x+L.w/2+L.pad,y1:o.y+L.h/2+L.pad};
     if(o.tip)b={x0:Math.min(b.x0,o.tip.x),y0:Math.min(b.y0,o.tip.y),x1:Math.max(b.x1,o.tip.x),y1:Math.max(b.y1,o.tip.y)};return b;}
   const xs=[],ys=[];if(o.type==='pen')o.pts.forEach(p=>{xs.push(p[0]);ys.push(p[1]);});else{xs.push(o.x1,o.x2);ys.push(o.y1,o.y2);}
@@ -324,6 +381,7 @@ function objDist(o,q){
   if(o.type==='text'){const L=labelLayout(o);let m=Math.hypot(Math.max(0,Math.abs(q.x-o.x)-L.w/2-L.pad),Math.max(0,Math.abs(q.y-o.y)-L.h/2-L.pad));
     if(L.lead)m=Math.min(m,distSeg(q.x,q.y,L.lead.x,L.lead.y,o.tip.x,o.tip.y));return m;}
   if(o.type==='pen'){let m=Infinity;const p=o.pts;for(let i=1;i<p.length;i++)m=Math.min(m,distSeg(q.x,q.y,p[i-1][0],p[i-1][1],p[i][0],p[i][1]));return m;}
+  if(MEAS.includes(o.type))return measDist(o,q);
   if(o.type==='arrow')return distSeg(q.x,q.y,o.x1,o.y1,o.x2,o.y2);
   const x0=Math.min(o.x1,o.x2),x1=Math.max(o.x1,o.x2),y0=Math.min(o.y1,o.y2),y1=Math.max(o.y1,o.y2);
   if(o.type==='rect')return Math.min(distSeg(q.x,q.y,x0,y0,x1,y0),distSeg(q.x,q.y,x1,y0,x1,y1),distSeg(q.x,q.y,x1,y1,x0,y1),distSeg(q.x,q.y,x0,y1,x0,y0));
@@ -334,7 +392,7 @@ function inLabel(o,q){const L=labelLayout(o);return Math.abs(q.x-o.x)<=L.w/2+L.p
 function translateObj(o,dx,dy,part){
   if(o.type==='text'){o.x+=dx;o.y+=dy;if(o.tip&&part!=='text')o.tip={x:o.tip.x+dx,y:o.tip.y+dy};return;}
   if(o.type==='pen'){o.pts=o.pts.map(p=>[p[0]+dx,p[1]+dy]);return;}
-  o.x1+=dx;o.y1+=dy;o.x2+=dx;o.y2+=dy;}
+  o.x1+=dx;o.y1+=dy;o.x2+=dx;o.y2+=dy;if(typeof o.cx==='number'){o.cx+=dx;o.cy+=dy;}}
 async function makeThumb(im,p,ds){const k=Math.min(1,360/Math.max(p.w,p.h));const c=document.createElement('canvas');
   c.width=Math.max(1,Math.round(p.w*k));c.height=Math.max(1,Math.round(p.h*k));const x=c.getContext('2d');
   x.imageSmoothingQuality='high';x.scale(k,k);x.drawImage(im,0,0,p.w,p.h);for(const d of ds)drawObj(x,d);
@@ -359,7 +417,7 @@ async function renderList(){
     const info=document.createElement('div');info.className='info';
     info.innerHTML='<div class="nm"></div><div class="dt"></div><div class="dt"></div><div class="dt"></div>';
     info.children[0].textContent=p.name;info.children[1].textContent='Создан: '+fmtDate(p.created);
-    info.children[2].textContent='Изменён: '+fmtDate(p.modified);const nd=(p.dims||[]).filter(o=>!o.type||o.type==='dim').length,no=(p.dims||[]).length-nd;
+    info.children[2].textContent='Изменён: '+fmtDate(p.modified);const nd=(p.dims||[]).filter(o=>!o.type||['dim','diam','rad','angle'].includes(o.type)).length,no=(p.dims||[]).length-nd;
     info.children[3].textContent='Размеров: '+nd+(no?`, пометок: ${no}`:'');
     if((p.comment||'').trim()){const cm=document.createElement('div');cm.className='cm';cm.textContent='💬 '+p.comment.trim().split('\n')[0];info.appendChild(cm);}
     th.onclick=info.onclick=()=>openEditor(p.id);
@@ -385,7 +443,7 @@ async function newProject(file){
 
 /* ---------- редактор: состояние ---------- */
 let proj=null,img=null,dims=[],selSet=new Set(),multi=false,mode='select',tmpP1=null,tmpP2=null,pendingDim=null,undoSt=[],redoSt=[],loupe=null;
-let tool='pen',labelMode='plain',tmpTip=null,pendingObj=null;
+let tool='pen',labelMode='plain',tmpTip=null,pendingObj=null,dimKind='lin',mpts=[];
 let view={s:1,tx:0,ty:0},fitS=1,cw=0,ch=0,dpr=1,saveTimer=null,thumbDirty=false;
 const cv=$('#cv'),ctx=cv.getContext('2d');
 const selList=()=>dims.filter(d=>selSet.has(d.id));
@@ -400,7 +458,7 @@ async function openEditor(id){
   try{const p=await dbGet('projects',id),ph=await dbGet('photos',id);if(!p||!ph)throw new Error('нет данных');
     img=await loadImg(ph.blob);proj=p;dims=clone(p.dims||[]);}
   catch(e){busy(false);img=null;proj=null;toast('Не удалось открыть проект');return;}
-  busy(false);undoSt=[];redoSt=[];selSet=new Set();multi=false;tmpP1=null;tmpP2=null;tmpTip=null;pendingObj=null;pendingDim=null;loupe=null;thumbDirty=false;
+  busy(false);undoSt=[];redoSt=[];selSet=new Set();multi=false;tmpP1=null;tmpP2=null;tmpTip=null;pendingObj=null;mpts=[];pendingDim=null;loupe=null;thumbDirty=false;
   $('#listScreen').classList.add('hidden');$('#editor').classList.remove('hidden');
   history.pushState({ed:1},'');
   cw=0;ch=0;sizeCanvas();fitView();setMode(dims.length?'select':'create');}
@@ -428,14 +486,15 @@ function undo(){if(act||!undoSt.length)return;redoSt.push(JSON.stringify(dims));
 function redo(){if(act||!redoSt.length)return;undoSt.push(JSON.stringify(dims));dims=JSON.parse(redoSt.pop());fixSel();changed();}
 $('#edUndo').onclick=undo;$('#edRedo').onclick=redo;
 
-function setMode(m){mode=m;tmpP1=null;tmpP2=null;tmpTip=null;pendingDim=null;pendingObj=null;if(m!=='select')multi=false;updateUI();render();}
+function setMode(m){mode=m;tmpP1=null;tmpP2=null;tmpTip=null;mpts=[];pendingDim=null;pendingObj=null;if(m!=='select')multi=false;updateUI();render();}
 $('#tSelect').onclick=()=>setMode('select');
 $('#tDim').onclick=()=>setMode('create');
 $('#tLabel').onclick=()=>setMode('text');
 $('#tDraw').onclick=()=>setMode('draw');
 $('#edNote').onclick=()=>editComment();
 $('#ctxBar').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.t)tool=b.dataset.t;
+  if(b.dataset.k){dimKind=b.dataset.k;mpts=[];tmpP1=null;tmpP2=null;pendingDim=null;pendingObj=null;}
+  else if(b.dataset.t)tool=b.dataset.t;
   else if(b.dataset.l){labelMode=b.dataset.l;tmpTip=null;pendingObj=null;}
   else{const k=b.dataset.b;if(k==='e'){editText();return;}if(k==='f'){flipSel();return;}if(k==='d'){delSel();return;}
     if(k==='m')multi=!multi;else if(k==='a'){multi=true;dims.forEach(d=>selSet.add(d.id));}else if(k==='x'){selSet.clear();multi=false;}}
@@ -452,25 +511,27 @@ function updateUI(){if(!proj)return;
   $('#edNote').classList.toggle('has',!!(proj.comment||'').trim());
   [['#tSelect','select'],['#tDim','create'],['#tLabel','text'],['#tDraw','draw']].forEach(([id,m])=>$(id).classList.toggle('on',mode===m));
   const L=selList(),n=L.length,one=n===1?L[0]:null;let h;
-  if(mode==='create')h=tmpP2?'Коснитесь, где разместить размерную линию':tmpP1?'Коснитесь второй точки':'Коснитесь первой точки · уточняйте по лупе · 2 пальца — масштаб';
+  if(mode==='create'&&dimKind!=='lin')h={angle:['Коснитесь вершины угла','Коснитесь точки на первой стороне','Коснитесь точки на второй стороне'],diam:['Коснитесь края отверстия','Коснитесь противоположного края'],rad:['Коснитесь центра дуги','Коснитесь точки на дуге']}[dimKind][mpts.length];
+  else if(mode==='create')h=tmpP2?'Коснитесь, где разместить размерную линию':tmpP1?'Коснитесь второй точки':'Коснитесь первой точки · уточняйте по лупе · 2 пальца — масштаб';
   else if(mode==='text')h=labelMode==='leader'?(tmpTip?'Коснитесь, где разместить текст':'Коснитесь точки, на которую указывает выноска'):'Коснитесь места для надписи';
   else if(mode==='draw')h={pen:'Рисуйте пальцем',arrow:'Проведите от начала стрелки к острию',oval:'Протяните, чтобы обвести овалом',rect:'Протяните, чтобы обвести рамкой'}[tool]+' · 2 пальца — масштаб';
   else if(multi)h='Касайтесь объектов, чтобы добавить или убрать из выбора · перетаскивание — сдвиг выбранных';
-  else if(one)h=(isDim(one)?'● — концы, ◆ — линия · ':(one.type==='text'&&one.tip?'● — острие выноски · ':(['arrow','oval','rect'].includes(one.type)?'● — углы · ':'')))+'перетащите, чтобы сдвинуть'+(isDim(one)||one.type==='text'?' · двойное касание — текст':'');
+  else if(one)h=(isDim(one)?'● — концы, ◆ — линия · ':one.type==='angle'?'● — вершина и стороны, ◆ — дуга · ':MEAS.includes(one.type)?'● — концы · ':(one.type==='text'&&one.tip?'● — острие выноски · ':(['arrow','oval','rect'].includes(one.type)?'● — углы · ':'')))+'перетащите, чтобы сдвинуть'+(isMeas(one)||one.type==='text'?' · двойное касание — текст':'');
   else h='Коснитесь объекта, чтобы выбрать · 1 палец — сдвиг фото, 2 — масштаб';
   $('#hint').textContent=h;$('#edTitle').textContent=proj.name;
   const parts=[];
+  if(mode==='create')[['lin','Линейный'],['angle','Угол'],['diam','Диаметр'],['rad','Радиус']].forEach(([k,l])=>parts.push(`<button data-k="${k}" class="${dimKind===k?'on':''}">${l}</button>`));
   if(mode==='draw')[['pen','Карандаш'],['arrow','Стрелка'],['oval','Овал'],['rect','Рамка']].forEach(([k,l])=>parts.push(`<button data-t="${k}" class="${tool===k?'on':''}">${l}</button>`));
   if(mode==='text')[['plain','Текст'],['leader','С выноской']].forEach(([k,l])=>parts.push(`<button data-l="${k}" class="${labelMode===k?'on':''}">${l}</button>`));
   if(n){if(parts.length)parts.push('<span class="sep"></span>');parts.push(`<span class="cnt">✓ ${n}</span>`);
-    if(one&&(isDim(one)||one.type==='text'))parts.push('<button data-b="e">Изменить</button>');
-    if(L.some(isDim))parts.push('<button data-b="f">Перевернуть</button>');
+    if(one&&(isMeas(one)||one.type==='text'))parts.push('<button data-b="e">Изменить</button>');
+    if(L.some(isMeas))parts.push('<button data-b="f">Перевернуть</button>');
     parts.push('<button data-b="d">Удалить</button>');}
   if(mode==='select'&&(n||multi))parts.push(`<button data-b="m" class="${multi?'on':''}">Несколько</button>`,'<button data-b="a">Все</button>','<button data-b="x" title="Снять выбор">✕</button>');
   const bar=$('#ctxBar');bar.innerHTML=parts.join('');bar.classList.toggle('hidden',!parts.length);}
 
 async function editText(){const o=selDim();if(!o)return;let v;
-  if(isDim(o))v=await askDimText(o.text);else if(o.type==='text')v=await askLabel(o.text);else return;
+  if(isMeas(o))v=await askDimText(o.text,true);else if(o.type==='text')v=await askLabel(o.text);else return;
   if(v===null||v===o.text||(o.type==='text'&&!v))return;pushHistory();o.text=v;changed();}
 async function editComment(){if(!proj)return;
   const r=await modal((box,close)=>{box.innerHTML=`<h3>Комментарий к фото</h3><textarea class="inp" rows="5" placeholder="Заметка к проекту: что за деталь, что проверить…"></textarea>
@@ -483,7 +544,8 @@ async function editComment(){if(!proj)return;
   proj.comment=r.t;proj.commentOnExport=r.p;changed();toast(r.t?'Комментарий сохранён':'Комментарий удалён');}
 function delSel(){const L=selList();if(!L.length)return;pushHistory();dims=dims.filter(x=>!selSet.has(x.id));selSet.clear();multi=false;changed();
   toast(L.length>1?`Удалено размеров: ${L.length}. Можно отменить ↶`:'Размер удалён. Можно отменить ↶');}
-function flipSel(){const L=selList().filter(isDim);if(!L.length)return;pushHistory();L.forEach(d=>{d.off=-d.off;});changed();}
+function flipSel(){const L=selList().filter(isMeas);if(!L.length)return;pushHistory();
+  L.forEach(o=>{if(isDim(o))o.off=-o.off;else if(o.type==='angle')o.rev=!o.rev;else o.ts=-(o.ts||1);});changed();}
 
 function makeDim(a,b){const base=Math.max(proj.w,proj.h)/1000;
   const d={id:uid(),x1:a.x,y1:a.y,x2:b.x,y2:b.y,off:0,text:'',color:settings.color,lw:settings.lw*base,fs:settings.fs*base,halo:settings.halo};
@@ -523,8 +585,8 @@ function drawOverlay(){
   ctx.setLineDash([]);
   if(one)for(const h of objHandles(L[0])){const sp=toScr(h.x,h.y);h.dia?handleDiamond(sp):handleCircle(sp);}
   ctx.restore();
-  const mk=(mode==='create'&&tmpP1)?tmpP1:(mode==='text'&&tmpTip)?tmpTip:null;
-  if(mk){const p=toScr(mk.x,mk.y);ctx.save();
+  const mks=mode==='create'?(dimKind==='lin'?(tmpP1?[tmpP1]:[]):mpts):(mode==='text'&&tmpTip)?[tmpTip]:[];
+  for(const mk of mks){const p=toScr(mk.x,mk.y);ctx.save();
     for(const [col,w] of [['rgba(0,0,0,.7)',4],['#ffeb3b',2]]){ctx.strokeStyle=col;ctx.lineWidth=w;ctx.beginPath();
       ctx.moveTo(p.x-12,p.y);ctx.lineTo(p.x+12,p.y);ctx.moveTo(p.x,p.y-12);ctx.lineTo(p.x,p.y+12);ctx.stroke();}ctx.restore();}}
 function drawLoupe(){
@@ -547,6 +609,8 @@ function objHandles(o){
   if(isDim(o)){const g=dimGeom(o);if(!g)return [];const oh=offHandle(g);return [{k:'p1',x:o.x1,y:o.y1},{k:'p2',x:o.x2,y:o.y2},{k:'off',x:oh.x,y:oh.y,dia:true}];}
   if(o.type==='text')return o.tip?[{k:'tip',x:o.tip.x,y:o.tip.y}]:[];
   if(o.type==='pen')return [];
+  if(o.type==='angle'){const P=angleParts(o),hs=[{k:'v',x:o.cx,y:o.cy},{k:'a',x:o.x1,y:o.y1},{k:'b',x:o.x2,y:o.y2}];
+    if(P){const am=P.arc.a1+P.arc.d/2;hs.push({k:'r',x:o.cx+Math.cos(am)*P.arc.r,y:o.cy+Math.sin(am)*P.arc.r,dia:true});}return hs;}
   return [{k:'a',x:o.x1,y:o.y1},{k:'b',x:o.x2,y:o.y2}];}
 function hitHandle(p){const o=selDim();if(!o)return null;let best=null,bd=30;
   for(const h of objHandles(o)){const sp=toScr(h.x,h.y),dd=Math.hypot(p.x-sp.x,p.y-sp.y);if(dd<bd){bd=dd;best=h;}}return best;}
@@ -558,15 +622,16 @@ function cancelAct(){if(!act)return;
   if(act.k==='handle')Object.assign(act.d,JSON.parse(act.snap));
   if(act.k==='move')act.targets.forEach((o,i)=>Object.assign(o,JSON.parse(act.snaps[i])));
   if(act.k==='place'&&!tmpP2)pendingDim=null;
-  if(act.k==='draw'||act.k==='lplace')pendingObj=null;
+  if(act.k==='draw'||act.k==='lplace'||act.k==='mplace')pendingObj=null;
   act=null;loupe=null;render();}
 function placeAt(p){const ip=clampImg(toImg(p));act.ip=ip;if(tmpP1)pendingDim=makeDim(tmpP1,ip);
   loupe=act.touchy?{ix:ip.x,iy:ip.y,sx:p.x,sy:p.y}:null;render();}
 function offsetAt(p){const d=pendingDim;if(!d)return;const ip=toImg(p),g=dimGeom(d);if(g)d.off=(ip.x-d.x1)*g.nx+(ip.y-d.y1)*g.ny;render();}
 function handleMove(p){const ip=toImg(p),x=ip.x+act.gx,y=ip.y+act.gy,o=act.d;
   if(act.h==='off'){const g=dimGeom(o);if(g)o.off=(x-o.x1)*g.nx+(y-o.y1)*g.ny;loupe=null;}
+  else if(act.h==='r'){o.r=Math.max(o.fs*0.6,Math.hypot(x-o.cx,y-o.cy));loupe=null;}
   else{const c=clampImg({x,y});
-    if(act.h==='p1'||act.h==='a'){o.x1=c.x;o.y1=c.y;}else if(act.h==='p2'||act.h==='b'){o.x2=c.x;o.y2=c.y;}else if(act.h==='tip')o.tip={x:c.x,y:c.y};
+    if(act.h==='v'){o.cx=c.x;o.cy=c.y;}else if(act.h==='p1'||act.h==='a'){o.x1=c.x;o.y1=c.y;}else if(act.h==='p2'||act.h==='b'){o.x2=c.x;o.y2=c.y;}else if(act.h==='tip')o.tip={x:c.x,y:c.y};
     loupe=act.touchy?{ix:c.x,iy:c.y,sx:p.x,sy:p.y}:null;}
   render();}
 function newBase(){const base=Math.max(proj.w,proj.h)/1000;return {id:uid(),color:settings.color,lw:settings.lw*base,fs:settings.fs*base,halo:settings.halo};}
@@ -580,6 +645,23 @@ function finishDraw(){const o=pendingObj;pendingObj=null;if(!o){render();return;
   if(o.type==='pen'&&o.pts.length<2){render();return;}
   const Bx=objBounds(o);if(Math.max(Bx.x1-Bx.x0,Bx.y1-Bx.y0)*view.s<8){render();return;}
   pushHistory();dims.push(o);selSet=new Set([o.id]);changed();}
+function buildMeas(kind,P){const b=newBase();
+  if(kind==='angle'){if(P.length<3)return null;const l1=Math.hypot(P[1].x-P[0].x,P[1].y-P[0].y),l2=Math.hypot(P[2].x-P[0].x,P[2].y-P[0].y);
+    return {...b,type:'angle',cx:P[0].x,cy:P[0].y,x1:P[1].x,y1:P[1].y,x2:P[2].x,y2:P[2].y,r:Math.max(b.fs*1.5,Math.min(l1,l2)*0.6),rev:false,text:''};}
+  if(P.length<2)return null;
+  const o={...b,type:kind,x1:P[0].x,y1:P[0].y,x2:P[1].x,y2:P[1].y,text:kind==='diam'?'Ø':'R',ts:1};
+  const L=Math.hypot(o.x2-o.x1,o.y2-o.y1)||1,ny=(o.x2-o.x1)/L;if(ny>1e-6)o.ts=-1;return o;}
+function mplaceAt(p){const ip=clampImg(toImg(p));act.ip=ip;loupe=act.touchy?{ix:ip.x,iy:ip.y,sx:p.x,sy:p.y}:null;
+  pendingObj=buildMeas(dimKind,[...mpts,ip]);render();}
+async function finishMplace(a){const ip=a.ip;if(!ip)return;
+  if(mpts.length){const last=mpts[mpts.length-1],s1=toScr(last.x,last.y),s2=toScr(ip.x,ip.y);
+    if(Math.hypot(s1.x-s2.x,s1.y-s2.y)<6){pendingObj=null;toast('Точка совпадает с предыдущей');render();return;}}
+  mpts.push(ip);const need=dimKind==='angle'?3:2;
+  if(mpts.length<need){pendingObj=null;updateUI();render();return;}
+  const o=buildMeas(dimKind,mpts);mpts=[];pendingObj=o;updateUI();render();
+  const v=await askDimText(o.text,true);pendingObj=null;
+  if(v===null||!proj){render();updateUI();return;}
+  o.text=v;pushHistory();dims.push(o);selSet=new Set([o.id]);changed();}
 function lplaceAt(p){const ip=clampImg(toImg(p));act.ip=ip;loupe=act.touchy?{ix:ip.x,iy:ip.y,sx:p.x,sy:p.y}:null;
   if(tmpTip)pendingObj={...newBase(),type:'text',x:ip.x,y:ip.y,text:'Текст',tip:{...tmpTip}};render();}
 async function finishLplace(a){const ip=a.ip;if(!ip)return;
@@ -600,6 +682,7 @@ cv.addEventListener('pointerdown',e=>{
   if(ptrs.size>2||locked)return;
   const touchy=e.pointerType!=='mouse';
   if(e.pointerType==='mouse'&&e.button!==0){act={k:'pan',last:p};return;}
+  if(mode==='create'&&dimKind!=='lin'){act={k:'mplace',touchy};mplaceAt(p);return;}
   if(mode==='create'){if(tmpP2){act={k:'offset'};offsetAt(p);return;}act={k:'place',touchy};placeAt(p);return;}
   if(mode==='text'){act={k:'lplace',touchy};lplaceAt(p);return;}
   if(mode==='draw'){startDraw(p);return;}
@@ -616,6 +699,7 @@ cv.addEventListener('pointermove',e=>{
   if(act.k==='place')placeAt(p);
   else if(act.k==='offset')offsetAt(p);
   else if(act.k==='lplace')lplaceAt(p);
+  else if(act.k==='mplace')mplaceAt(p);
   else if(act.k==='draw')moveDraw(p);
   else if(act.k==='handle')handleMove(p);
   else if(act.k==='tap'&&Math.hypot(p.x-act.start.x,p.y-act.start.y)>8){
@@ -634,6 +718,7 @@ function onUp(e){
   if(a.k==='place')finishPlace(a);
   else if(a.k==='offset')finishOffset();
   else if(a.k==='lplace')finishLplace(a);
+  else if(a.k==='mplace')finishMplace(a);
   else if(a.k==='draw')finishDraw();
   else if(a.k==='handle'){if(JSON.stringify(a.d)!==a.snap){pushHistory(a.before);changed();}else render();}
   else if(a.k==='move'){pushHistory(a.before);changed();}
@@ -669,7 +754,7 @@ document.addEventListener('keydown',e=>{
   else if((e.ctrlKey||e.metaKey)&&e.code==='KeyY'){e.preventDefault();redo();}
   else if(e.key==='Delete')delSel();
   else if((e.ctrlKey||e.metaKey)&&e.code==='KeyA'&&mode==='select'){e.preventDefault();dims.forEach(d=>selSet.add(d.id));updateUI();render();}
-  else if(e.key==='Escape'){if(tmpP1||tmpP2||tmpTip){tmpP1=null;tmpP2=null;tmpTip=null;pendingDim=null;pendingObj=null;}else{selSet.clear();multi=false;}updateUI();render();}});
+  else if(e.key==='Escape'){if(tmpP1||tmpP2||tmpTip||mpts.length){tmpP1=null;tmpP2=null;tmpTip=null;mpts=[];pendingDim=null;pendingObj=null;}else{selSet.clear();multi=false;}updateUI();render();}});
 
 /* ---------- оформление ---------- */
 function applyStyle(list){if(!list.length)return;pushHistory();const base=Math.max(proj.w,proj.h)/1000;
@@ -761,7 +846,7 @@ async function openExport(){
 async function exportBackup(){
   busy(true,'Создание копии…');
   try{const ps=await dbAll('projects');if(!ps.length){busy(false);toast('Нет проектов для копирования');return;}
-    const parts=[`{"app":"${APP_ID}","version":2,"exported":${Date.now()},"projects":[`];
+    const parts=[`{"app":"${APP_ID}","version":3,"exported":${Date.now()},"projects":[`];
     for(let i=0;i<ps.length;i++){const {thumb,...rest}=ps[i];const ph=await dbGet('photos',rest.id);if(!ph)continue;
       parts.push((parts.length>1?',':'')+JSON.stringify({...rest,photo:await blobToDataURL(ph.blob)}));}
     parts.push(']}');const d=new Date(),pad=n=>String(n).padStart(2,'0');
@@ -783,16 +868,18 @@ function backupReady(blob,name,n){const sf=shareableBackup(blob,name);return mod
   q('.sv').onclick=()=>{download(blob,name);markExport();toast('Копия сохранена в «Загрузки»');};
   q('.cl').onclick=()=>close(null);});}
 const isNum=v=>typeof v==='number'&&Number.isFinite(v);
-const OBJ_TYPES=['dim','text','pen','arrow','oval','rect'];
+const OBJ_TYPES=['dim','text','pen','arrow','oval','rect','diam','rad','angle'];
 function validObj(d){if(!d||typeof d.id!=='string')return false;const t=d.type||'dim';if(!OBJ_TYPES.includes(t))return false;
   if(!isNum(d.lw)||!isNum(d.fs)||d.lw<=0||d.fs<=0)return false;
   if(t==='dim')return ['x1','y1','x2','y2','off'].every(k=>isNum(d[k]))&&typeof d.text==='string';
   if(t==='text')return isNum(d.x)&&isNum(d.y)&&typeof d.text==='string'&&(d.tip==null||(isNum(d.tip.x)&&isNum(d.tip.y)));
+  if(t==='diam'||t==='rad')return ['x1','y1','x2','y2'].every(k=>isNum(d[k]))&&typeof d.text==='string';
+  if(t==='angle')return ['cx','cy','x1','y1','x2','y2','r'].every(k=>isNum(d[k]))&&typeof d.text==='string';
   if(t==='pen')return Array.isArray(d.pts)&&d.pts.length>=2&&d.pts.every(p=>Array.isArray(p)&&isNum(p[0])&&isNum(p[1]));
   return ['x1','y1','x2','y2'].every(k=>isNum(d[k]));}
 function validateBackup(o){
   if(!o||o.app!==APP_ID||!Array.isArray(o.projects))throw 'Файл не является резервной копией этого приложения.';
-  if(o.version>2)throw 'Копия создана более новой версией приложения. Обновите приложение.';
+  if(o.version>3)throw 'Копия создана более новой версией приложения. Обновите приложение.';
   if(!o.projects.length)throw 'В копии нет проектов.';
   const ids=new Set();
   o.projects.forEach((p,i)=>{const w=`Проект №${i+1}`;
@@ -805,6 +892,8 @@ function validateBackup(o){
 function cleanObj(d){const t=d.type||'dim',b={id:d.id,color:/^#[0-9a-f]{6}$/i.test(d.color||'')?d.color:'#e53935',lw:d.lw,fs:d.fs,halo:d.halo!==false};
   if(t==='dim')return {...b,x1:d.x1,y1:d.y1,x2:d.x2,y2:d.y2,off:d.off,text:d.text};
   if(t==='text')return {...b,type:'text',x:d.x,y:d.y,text:d.text,tip:d.tip?{x:d.tip.x,y:d.tip.y}:null};
+  if(t==='diam'||t==='rad')return {...b,type:t,x1:d.x1,y1:d.y1,x2:d.x2,y2:d.y2,text:d.text,ts:d.ts===-1?-1:1};
+  if(t==='angle')return {...b,type:'angle',cx:d.cx,cy:d.cy,x1:d.x1,y1:d.y1,x2:d.x2,y2:d.y2,r:d.r,rev:!!d.rev,text:d.text};
   if(t==='pen')return {...b,type:'pen',pts:d.pts.map(p=>[p[0],p[1]])};
   return {...b,type:t,x1:d.x1,y1:d.y1,x2:d.x2,y2:d.y2};}
 $('#fBackup').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)importBackup(f);};
