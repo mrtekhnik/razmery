@@ -195,7 +195,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.10',APP_DATE='29.10.2026';
+const APP_VERSION='1.11',APP_DATE='29.10.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -241,7 +241,9 @@ let toastT;
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.remove('hidden');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.add('hidden'),2600);}
 function busy(on,msg){$('#busy span').textContent=msg||'Подождите…';$('#busy').classList.toggle('hidden',!on);}
 function loadImg(blob){return new Promise((res,rej)=>{const u=URL.createObjectURL(blob);const im=new Image();
-  im.onload=()=>res(im);im.onerror=()=>{URL.revokeObjectURL(u);rej(new Error('img'));};im.src=u;});}
+  im.onload=()=>{if(im.decode)im.decode().then(()=>res(im),()=>res(im));else res(im);};im.onerror=()=>{URL.revokeObjectURL(u);rej(new Error('img'));};im.src=u;});}
+async function makePreview(im,w,h){const k=Math.min(1,1280/Math.max(w,h)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(w*k));c.height=Math.max(1,Math.round(h*k));
+  const x=c.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(im,0,0,c.width,c.height);const b=await toBlob(c,'image/jpeg',0.85);c.width=c.height=0;return b;}
 const toBlob=(c,type,q)=>new Promise(res=>c.toBlob(res,type,q));
 function blobToDataURL(b){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(b);});}
 function dataUrlToBlob(u){const i=u.indexOf(',');const type=u.slice(5,i).split(';')[0];const bin=atob(u.slice(i+1));
@@ -609,7 +611,7 @@ async function massCopy(){const L=selRecs();if(!L.length)return;const r=await pi
   busy(true,'Копирование…');
   try{const now=Date.now(),items=[];
     for(const p of L){const ph=await dbGet('photos',p.id);if(!ph)continue;const id=uid();
-      items.push(['projects',{...p,id,name:(r.id===(p.folderId||null))?p.name+' (копия)':p.name,created:now,modified:now,folderId:r.id,deleted:0,dims:clone(p.dims||[])}],['photos',{id,blob:ph.blob}]);}
+      items.push(['projects',{...p,id,name:(r.id===(p.folderId||null))?p.name+' (копия)':p.name,created:now,modified:now,folderId:r.id,deleted:0,dims:clone(p.dims||[])}],['photos',{id,blob:ph.blob,preview:ph.preview}]);}
     await dbPutMany(items);busy(false);toast(`Скопировано: ${items.length/2}`);doneSel();}
   catch(e){busy(false);alertBox('Ошибка','Не удалось скопировать. Возможно, не хватает места.');}}
 async function massTrash(){const L=selRecs();if(!L.length)return;
@@ -647,8 +649,8 @@ async function newProject(file){
   try{const blob=file.slice(0,file.size,file.type||'image/jpeg');const im=await loadImg(blob);
     const w=im.naturalWidth,h=im.naturalHeight;if(!w||!h)throw new Error('size');
     const now=Date.now(),id=uid();const p={id,name:'Фото '+fmtDate(now),created:now,modified:now,w,h,dims:[],folderId:curFolder};
-    p.thumb=await makeThumb(im,p,[]);URL.revokeObjectURL(im.src);
-    await dbPutMany([['projects',p],['photos',{id,blob}]]);busy(false);openEditor(id);
+    p.thumb=await makeThumb(im,p,[]);const preview=await makePreview(im,w,h);URL.revokeObjectURL(im.src);
+    await dbPutMany([['projects',p],['photos',{id,blob,preview}]]);busy(false);openEditor(id);
   }catch(e){busy(false);alertBox('Не удалось открыть изображение','Формат не поддерживается браузером или файл повреждён. Попробуйте JPG или PNG.');}}
 
 /* ---------- редактор: состояние ---------- */
@@ -663,11 +665,16 @@ const toScr=(x,y)=>({x:x*view.s+view.tx,y:y*view.s+view.ty});
 const clampImg=p=>({x:clamp(p.x,0,proj.w),y:clamp(p.y,0,proj.h)});
 const minS=()=>fitS*0.5,maxS=()=>Math.max(fitS*40,8);
 
+let fullPromise=null;
 async function openEditor(id){
-  busy(true,'Открытие…');
-  try{const p=await dbGet('projects',id),ph=await dbGet('photos',id);if(!p||!ph)throw new Error('нет данных');
-    img=await loadImg(ph.blob);proj=p;dims=clone(p.dims||[]);}
+  let ph,usedPreview=false;
+  try{const p=await dbGet('projects',id);ph=await dbGet('photos',id);if(!p||!ph)throw new Error('нет данных');
+    if(ph.preview){try{img=await loadImg(ph.preview);usedPreview=true;}catch(e){}}
+    if(!usedPreview){busy(true,'Открытие…');img=await loadImg(ph.blob);}
+    proj=p;dims=clone(p.dims||[]);}
   catch(e){busy(false);img=null;proj=null;toast('Не удалось открыть проект');return;}
+  if(usedPreview){fullPromise=loadImg(ph.blob).then(im=>{if(proj&&proj.id===id){const prev=img;img=im;URL.revokeObjectURL(prev.src);render();}else URL.revokeObjectURL(im.src);},()=>{});}
+  else{fullPromise=Promise.resolve();const full=img;makePreview(full,proj.w,proj.h).then(b=>dbPut('photos',{...ph,preview:b})).catch(()=>{});}
   busy(false);undoSt=[];redoSt=[];selSet=new Set();multi=false;tmpP1=null;tmpP2=null;tmpTip=null;pendingObj=null;mpts=[];pendingDim=null;loupe=null;thumbDirty=false;
   $('#listScreen').classList.add('hidden');$('#editor').classList.remove('hidden');
   history.pushState({ed:1},'');
@@ -1065,7 +1072,7 @@ async function renderExport(fmt,withNote,P=proj,IM=img,OBJ=dims){
   return {blob,w,h:H,scaled};}
 function canShareFiles(){try{return !!(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([new Blob(['x'],{type:'image/png'})],'t.png',{type:'image/png'})]}));}catch(e){return false;}}
 async function openExport(){
-  if(!proj)return;cancelAct();await saveNow();
+  if(!proj)return;cancelAct();if(fullPromise){busy(true,'Подготовка…');await fullPromise;busy(false);}if(!proj)return;await saveNow();
   let fmt='jpg',blob=null,gen=0,withNote=!!proj.commentOnExport;const hasNote=!!(proj.comment||'').trim();const shareOK=canShareFiles();const fname=()=>safeName(proj.name)+'_размеры.'+fmt;
   await modal((box,close)=>{
     box.innerHTML=`<h3>Экспорт изображения</h3><p class="note">Создаётся отдельная копия с размерами. Исходное фото в проекте не меняется.</p>
