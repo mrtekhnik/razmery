@@ -251,7 +251,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.17',APP_DATE='29.10.2026';
+const APP_VERSION='1.18',APP_DATE='29.10.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -288,7 +288,7 @@ function dbDelProject(id){const t=db.transaction(['projects','photos'],'readwrit
   t.objectStore('projects').delete(id);t.objectStore('photos').delete(id);return txDone(t);}
 
 /* ---------- настройки ---------- */
-let settings={pdfIn:{dpi:200},pdf:{paper:'a4',dpi:150,mode:'over',all:true},expSize:0,stitch:{dir:'row',gap:1,bg:'#ffffff',cols:0},adjustOnLoad:true,color:'#e53935',lw:3,fs:36,halo:true,placeMode:'click3',angleRays:true,gridCols:2,ortho:true,snapPts:true,askName:true,hintOff:false,sort:'date',recent:[]};
+let settings={syncDelay:3600000,pdfIn:{dpi:200},pdf:{paper:'a4',dpi:150,mode:'over',all:true},expSize:0,stitch:{dir:'row',gap:1,bg:'#ffffff',cols:0},adjustOnLoad:true,color:'#e53935',lw:3,fs:36,halo:true,placeMode:'click3',angleRays:true,gridCols:2,ortho:true,snapPts:true,askName:true,hintOff:false,sort:'date',recent:[]};
 let bkInfo={lastExport:0,lastImport:0};
 async function loadBk(){try{const r=await dbGet('meta','backup');if(r&&r.value)bkInfo={...bkInfo,...r.value};}catch(e){}}
 function saveBk(){dbPut('meta',{key:'backup',value:bkInfo}).catch(()=>{});}
@@ -773,7 +773,10 @@ async function renderList(){
     if(!curFolder)chip(inTrash.length?`Корзина (${inTrash.length})`:'Корзина',()=>navPush('trash'));}
   renderBkLine(live);if(trashView||selMode||searchQ)$('#bkLine').classList.add('hidden');
   $('#srch').classList.toggle('hidden',trashView||selMode);$('#srchX').classList.toggle('hidden',!searchQ);
-  {const t=syncState.lastSync,cfg=syncCfg();const dirty=!!cfg&&(!t||all.some(p=>p.modified>t)||Object.keys(purged).length>0||folders.some(f=>(f.mod||0)>t)||Object.values(folderTomb).some(v=>v>t));
+  {const t=syncState.lastSync,cfg=syncCfg();const ch=[];if(cfg&&t){all.forEach(p=>{if(p.modified>t)ch.push(p.modified);});Object.values(purged).forEach(v=>ch.push(v));folders.forEach(f=>{if((f.mod||0)>t)ch.push(f.mod);});Object.values(folderTomb).forEach(v=>{if(v>t)ch.push(v);});}
+    const first=ch.length?Math.min(...ch):0,dl=settings.syncDelay??3600000;
+    const dirty=!!cfg&&(!t?all.length>0:(ch.length>0&&Date.now()-first>=dl));
+    clearTimeout(window.__dotT);if(cfg&&t&&ch.length&&!dirty){window.__dotT=setTimeout(()=>{if(!proj)renderList();},Math.min(dl-(Date.now()-first)+500,2147483000));}
     const b=$('#lsSync');b.classList.toggle('has',dirty);b.title=dirty?'Есть несинхронизированные изменения':'Синхронизировать';}
   const cols=settings.gridCols||2;list.className='g'+cols;list.innerHTML='';let items;
   if(trashView)items=inTrash.sort((a,b)=>b.deleted-a.deleted);
@@ -1470,13 +1473,18 @@ function openSettings(tab){return modal((box,close)=>{
   <div class="lbl">Токен доступа</div><input class="inp sm tok" type="password" placeholder="github_pat_…" autocomplete="off" autocapitalize="off" spellcheck="false">
   <div class="row2"><button class="btn sy1">Сохранить и проверить</button><button class="btn ghost sy0">Отключить</button></div>
   <p class="note sst"></p>
+  <div class="lbl">Напоминать о синхронизации (жёлтая точка на ⟳)</div>
+  <div class="seg sd"><button data-d="0">Сразу</button><button data-d="3600000">Через 1 ч</button><button data-d="10800000">Через 3 ч</button><button data-d="86400000">Через сутки</button></div>
+  <p class="note">Отсчёт — от первого несинхронизированного изменения.</p>
   </div>
   <div class="mbtns"><button class="btn pri ok">Готово</button></div>`;
   const showTab=t=>{box.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));box.querySelectorAll('[data-pane]').forEach(d=>d.classList.toggle('hidden',d.dataset.pane!==t));
     if(t==='s')requestAnimationFrame(()=>upd(true));};
   box.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));showTab(tab||'p');
   const ck=(cls,key,def)=>{const el=box.querySelector(cls);el.checked=settings[key]===undefined?def:!!settings[key];el.onchange=()=>{settings[key]=el.checked;saveSettings();};};
-  ck('.ortho','ortho',true);ck('.snp','snapPts',true);ck('.askn','askName',true);ck('.adjl','adjustOnLoad',true);
+  ck('.ortho','ortho',true);ck('.snp','snapPts',true);ck('.askn','askName',true);
+  {const bs=box.querySelectorAll('.sd button'),mk=()=>bs.forEach(b=>b.classList.toggle('on',+b.dataset.d===(settings.syncDelay??3600000)));mk();bs.forEach(b=>b.onclick=()=>{settings.syncDelay=+b.dataset.d;saveSettings();mk();});}
+  ck('.adjl','adjustOnLoad',true);
   {const el=box.querySelector('.hnt');el.checked=!settings.hintOff;el.onchange=()=>{settings.hintOff=!el.checked;saveSettings();if(proj)updateUI();};}
   const q=s=>box.querySelector(s),sws=q('.sws'),pc=q('.prev');
   function drawSw(){sws.innerHTML='';const cur=settings.color.toLowerCase();
