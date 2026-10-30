@@ -88,8 +88,8 @@ header.top h1{font-size:18px;margin:0 6px;flex:1;white-space:nowrap;overflow:hid
 #toast{position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#222a33;color:#fff;padding:10px 16px;border-radius:20px;z-index:60;font-size:14px;max-width:90%;text-align:center;pointer-events:none}
 .tool span{white-space:nowrap;font-size:11px}
 #edNote{position:relative}
-#hint{pointer-events:auto;cursor:pointer}
-#hint::after{content:'  ✕';opacity:.6}
+#hint{pointer-events:none}
+#hint .hx{pointer-events:auto;display:inline-block;margin:-6px -8px -6px 4px;padding:6px 10px;opacity:.75;cursor:pointer}
 #hintQ{position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;background:rgba(20,25,32,.75);color:#fff;font-weight:700;font-size:17px}
 .tabs{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:4px 0 6px}
 .tabs button{flex:1;height:40px;font-weight:600;font-size:14px}
@@ -264,7 +264,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.26',APP_DATE='29.10.2026';
+const APP_VERSION='1.27',APP_DATE='29.10.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -331,11 +331,12 @@ function download(blob,name){const u=URL.createObjectURL(blob);const a=document.
 const safeName=s=>(s||'проект').replace(/[\\/:*?"<>|]+/g,'_').trim().slice(0,80)||'проект';
 
 /* ---------- окна ---------- */
-let modalClose=null;
-function modal(build){return new Promise(res=>{const ov=$('#ov'),box=$('#mbox');box.innerHTML='';ov.classList.remove('hidden');
+let modalClose=null,modalOpenedAt=0;
+function modal(build){return new Promise(res=>{const ov=$('#ov'),box=$('#mbox');box.innerHTML='';ov.classList.remove('hidden');modalOpenedAt=Date.now();
   let done=false;const close=v=>{if(done)return;done=true;ov.classList.add('hidden');box.innerHTML='';modalClose=null;res(v===undefined?null:v);};
   modalClose=close;build(box,close);});}
-$('#ov').addEventListener('click',e=>{if(e.target.id==='ov'&&modalClose)modalClose(null);});
+// Касание пальцем порождает запоздалый «клик» в той же точке: он не должен закрывать только что открытое окно
+$('#ov').addEventListener('click',e=>{if(e.target.id==='ov'&&modalClose&&Date.now()-modalOpenedAt>600)modalClose(null);});
 function insertAtCursor(inp,s){const a=inp.selectionStart??inp.value.length,b=inp.selectionEnd??a;
   inp.value=inp.value.slice(0,a)+s+inp.value.slice(b);inp.selectionStart=inp.selectionEnd=a+s.length;inp.focus();}
 function askText(title,value,opts={}){return modal((box,close)=>{
@@ -1123,7 +1124,7 @@ function setMode(m){closeMore();moveMode=false;mode=m;tmpP1=null;tmpP2=null;tmpT
 $('#tSelect').onclick=()=>setMode('select');
 $('#tDim').onclick=()=>setMode('create');
 $('#tLabel').onclick=()=>setMode('text');
-$('#hint').onclick=()=>{settings.hintOff=true;saveSettings();updateUI();toast('Подсказки скрыты. Показать — кнопка «?»');};
+$('#hint').onclick=e=>{if(!e.target.closest('.hx'))return;settings.hintOff=true;saveSettings();updateUI();toast('Подсказки скрыты. Показать — кнопка «?»');};
 $('#hintQ').onclick=()=>{settings.hintOff=false;saveSettings();updateUI();};
 $('#tDraw').onclick=()=>setMode('draw');
 $('#edNote').onclick=()=>editComment();
@@ -1170,7 +1171,7 @@ function updateUI(){if(!proj)return;
   else if(multi)h='Касайтесь объектов, чтобы добавить или убрать из выбора · перетаскивание — сдвиг выбранных';
   else if(one)h=(one.shelf&&isMeas(one)?'■ — полка · ':'')+(isDim(one)?'● — концы, ◆ — линия · ':one.type==='angle'?'● — вершина и стороны, ◆ — дуга · ':MEAS.includes(one.type)?'● — концы · ':(one.type==='text'&&one.tip?'● — острие выноски · ':(['arrow','oval','rect'].includes(one.type)?'● — углы · ':'')))+(isMeas(one)&&!moveMode?'сдвинуть целиком — «Ещё» → «Переместить»':'перетащите, чтобы сдвинуть')+(isMeas(one)||one.type==='text'?' · двойное касание — текст':'');
   else h='Коснитесь объекта, чтобы выбрать · 1 палец — сдвиг фото, 2 — масштаб';
-  $('#hint').textContent=h;$('#hint').classList.toggle('hidden',!!settings.hintOff);$('#hintQ').classList.toggle('hidden',!settings.hintOff);$('#edTitle').textContent=proj.name;
+  $('#hint').innerHTML='';$('#hint').append(h);{const x=document.createElement('span');x.className='hx';x.textContent='✕';x.title='Скрыть подсказки';$('#hint').append(x);}$('#hint').classList.toggle('hidden',!!settings.hintOff);$('#hintQ').classList.toggle('hidden',!settings.hintOff);$('#edTitle').textContent=proj.name;
   const sub=$('#subBar'),kinds=mode==='create'?[['lin','⟷','Линейный'],['angle','∠','Угол'],['diam','Ø','Диаметр'],['rad','R','Радиус']]
     :mode==='draw'?[['pen','✎','Карандаш'],['arrow','↗','Стрелка'],['oval','◯','Овал'],['rect','▭','Рамка']]
     :mode==='text'?[['plain','Т','Текст'],['leader','Т↙','С выноской']]:null;
@@ -1452,6 +1453,8 @@ function onUp(e){
 cv.addEventListener('pointerup',onUp);cv.addEventListener('pointercancel',onUp);
 cv.addEventListener('wheel',e=>{e.preventDefault();const p=pos(e);zoomAt(Math.exp(-e.deltaY*0.0015),p.x,p.y);},{passive:false});
 cv.addEventListener('contextmenu',e=>e.preventDefault());
+// не даём касанию по холсту породить запоздалый «клик» по окну, которое откроется в той же точке
+cv.addEventListener('touchend',e=>{if(e.cancelable)e.preventDefault();},{passive:false});
 
 async function finishPlace(a){
   const ip=a.ip;if(!ip){render();return;}
