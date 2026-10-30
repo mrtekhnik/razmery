@@ -264,7 +264,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.22',APP_DATE='29.10.2026';
+const APP_VERSION='1.23',APP_DATE='29.10.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -273,7 +273,7 @@ text:'M5 7V4h14v3M12 4v16M9 20h6',trash:'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-1
 style:'M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3c2.6 0 4.7-2.1 4.7-4.7C22 5.9 17.5 3 12 3zM7.5 11h.01M10.5 7h.01M15.5 7.5h.01',
 plus:'M12 5v14M5 12h14',minus:'M5 12h14',fit:'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
 camera:'M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',image:'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4',
-select:'M4 4h6M14 4h6M4 20h6M14 20h6M4 4v6M4 14v6M20 4v6M20 14v6',rays:'M4 19L19 7M4 19h16M13 19a9 9 0 0 0-2-6',all:'M3 3h18v18H3zM8 12l3 3 5-6',dots:'M12 5h.01M12 12h.01M12 19h.01',more:'M5 12h.01M12 12h.01M19 12h.01',copy:'M9 9h11v11H9zM5 15H4V4h11v1',shelf:'M4 19l7-8h9M12 7h7',close:'M6 6l12 12M18 6L6 18',pdf:'M6 2h9l5 5v15H6zM14 2v6h6M9 13h2a1.5 1.5 0 0 1 0 3H9v-5M9 16v2',crop:'M6 2v14a2 2 0 0 0 2 2h14M18 22V8a2 2 0 0 0-2-2H2',stitch:'M3 5h8v14H3zM13 5h8v14h-8z',sync:'M20 12a8 8 0 0 1-14 5.3M4 12a8 8 0 0 1 14-5.3M18 3v4h-4M6 21v-4h4',folder:'M3 6h6l2 2h10v11H3z',restore:'M4 12a8 8 0 1 0 2.5-5.8M4 4v4h4',flip:'M7 20V4M3 8l4-4 4 4M17 4v16M13 16l4 4 4-4',note:'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5',pen:'M4 20l4-1 11-11-3-3L5 16zM14 6l3 3',edit:'M4 20h4L19 9l-4-4L4 16zM14 6l4 4'};
+select:'M4 4h6M14 4h6M4 20h6M14 20h6M4 4v6M4 14v6M20 4v6M20 14v6',rays:'M4 19L19 7M4 19h16M13 19a9 9 0 0 0-2-6',all:'M3 3h18v18H3zM8 12l3 3 5-6',move:'M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3',dots:'M12 5h.01M12 12h.01M12 19h.01',more:'M5 12h.01M12 12h.01M19 12h.01',copy:'M9 9h11v11H9zM5 15H4V4h11v1',shelf:'M4 19l7-8h9M12 7h7',close:'M6 6l12 12M18 6L6 18',pdf:'M6 2h9l5 5v15H6zM14 2v6h6M9 13h2a1.5 1.5 0 0 1 0 3H9v-5M9 16v2',crop:'M6 2v14a2 2 0 0 0 2 2h14M18 22V8a2 2 0 0 0-2-2H2',stitch:'M3 5h8v14H3zM13 5h8v14h-8z',sync:'M20 12a8 8 0 0 1-14 5.3M4 12a8 8 0 0 1 14-5.3M18 3v4h-4M6 21v-4h4',folder:'M3 6h6l2 2h10v11H3z',restore:'M4 12a8 8 0 1 0 2.5-5.8M4 4v4h4',flip:'M7 20V4M3 8l4-4 4 4M17 4v16M13 16l4 4 4-4',note:'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5',pen:'M4 20l4-1 11-11-3-3L5 16zM14 6l3 3',edit:'M4 20h4L19 9l-4-4L4 16zM14 6l4 4'};
 const ic=n=>`<svg class="i" viewBox="0 0 24 24"${n==='dots'?' style="stroke-width:3.5"':''}><path d="${ICONS[n]}"/></svg>`;
 document.querySelectorAll('[data-ic]').forEach(el=>el.insertAdjacentHTML('afterbegin',ic(el.dataset.ic)));
 
@@ -1055,7 +1055,7 @@ async function newProject(file){
 
 /* ---------- редактор: состояние ---------- */
 let proj=null,img=null,dims=[],selSet=new Set(),multi=false,mode='select',tmpP1=null,tmpP2=null,pendingDim=null,undoSt=[],redoSt=[],loupe=null;
-let tool='pen',labelMode='plain',tmpTip=null,pendingObj=null,dimKind='lin',mpts=[];
+let moveMode=false,tool='pen',labelMode='plain',tmpTip=null,pendingObj=null,dimKind='lin',mpts=[];
 let view={s:1,tx:0,ty:0},fitS=1,cw=0,ch=0,dpr=1,saveTimer=null,thumbDirty=false;
 const cv=$('#cv'),ctx=cv.getContext('2d');
 const selList=()=>dims.filter(d=>selSet.has(d.id));
@@ -1119,7 +1119,7 @@ function undo(){if(act||!undoSt.length)return;redoSt.push(JSON.stringify(dims));
 function redo(){if(act||!redoSt.length)return;undoSt.push(JSON.stringify(dims));dims=JSON.parse(redoSt.pop());fixSel();changed();}
 $('#edUndo').onclick=undo;$('#edRedo').onclick=redo;
 
-function setMode(m){closeMore();mode=m;tmpP1=null;tmpP2=null;tmpTip=null;mpts=[];pendingDim=null;pendingObj=null;if(m!=='select')multi=false;updateUI();render();}
+function setMode(m){closeMore();moveMode=false;mode=m;tmpP1=null;tmpP2=null;tmpTip=null;mpts=[];pendingDim=null;pendingObj=null;if(m!=='select')multi=false;updateUI();render();}
 $('#tSelect').onclick=()=>setMode('select');
 $('#tDim').onclick=()=>setMode('create');
 $('#tLabel').onclick=()=>setMode('text');
@@ -1148,7 +1148,7 @@ function barClick(e){const b=e.target.closest('button');if(!b)return;
   else if(b.dataset.t)tool=b.dataset.t;
   else if(b.dataset.l){labelMode=b.dataset.l;tmpTip=null;pendingObj=null;}
   else{const k=b.dataset.b;if(k==='more'){moreMenu(b);return;}closeMore();if(k==='e'){editText();return;}if(k==='st'){quickStyle();return;}if(k==='c'){dupSel();return;}if(k==='s'){toggleShelf();return;}if(k==='g'){toggleRays();return;}if(k==='f'){flipSel();return;}if(k==='d'){delSel();return;}
-    if(k==='m')multi=!multi;else if(k==='a'){multi=true;dims.forEach(d=>selSet.add(d.id));}else if(k==='x'){selSet.clear();multi=false;}}
+    if(k==='m')multi=!multi;else if(k==='a'){multi=true;dims.forEach(d=>selSet.add(d.id));}else if(k==='x'){selSet.clear();multi=false;moveMode=false;}else if(k==='mv')moveMode=!moveMode;}
   updateUI();render();}
 $('#ctxBar').addEventListener('click',barClick);$('#subBar').addEventListener('click',barClick);
 $('#tStyle').onclick=()=>openSettings();
@@ -1168,7 +1168,7 @@ function updateUI(){if(!proj)return;
   else if(mode==='text')h=labelMode==='leader'?(tmpTip?'Коснитесь, где разместить текст':'Коснитесь точки, на которую указывает выноска'):'Коснитесь места для надписи';
   else if(mode==='draw')h={pen:'Рисуйте пальцем',arrow:'Проведите от начала стрелки к острию',oval:'Протяните, чтобы обвести овалом',rect:'Протяните, чтобы обвести рамкой'}[tool]+' · 2 пальца — масштаб';
   else if(multi)h='Касайтесь объектов, чтобы добавить или убрать из выбора · перетаскивание — сдвиг выбранных';
-  else if(one)h=(one.shelf&&isMeas(one)?'■ — полка · ':'')+(isDim(one)?'● — концы, ◆ — линия · ':one.type==='angle'?'● — вершина и стороны, ◆ — дуга · ':MEAS.includes(one.type)?'● — концы · ':(one.type==='text'&&one.tip?'● — острие выноски · ':(['arrow','oval','rect'].includes(one.type)?'● — углы · ':'')))+'перетащите, чтобы сдвинуть'+(isMeas(one)||one.type==='text'?' · двойное касание — текст':'');
+  else if(one)h=(one.shelf&&isMeas(one)?'■ — полка · ':'')+(isDim(one)?'● — концы, ◆ — линия · ':one.type==='angle'?'● — вершина и стороны, ◆ — дуга · ':MEAS.includes(one.type)?'● — концы · ':(one.type==='text'&&one.tip?'● — острие выноски · ':(['arrow','oval','rect'].includes(one.type)?'● — углы · ':'')))+(isMeas(one)&&!moveMode?'сдвинуть целиком — «Ещё» → «Переместить»':'перетащите, чтобы сдвинуть')+(isMeas(one)||one.type==='text'?' · двойное касание — текст':'');
   else h='Коснитесь объекта, чтобы выбрать · 1 палец — сдвиг фото, 2 — масштаб';
   $('#hint').textContent=h;$('#hint').classList.toggle('hidden',!!settings.hintOff);$('#hintQ').classList.toggle('hidden',!settings.hintOff);$('#edTitle').textContent=proj.name;
   const sub=$('#subBar'),kinds=mode==='create'?[['lin','⟷','Линейный'],['angle','∠','Угол'],['diam','Ø','Диаметр'],['rad','R','Радиус']]
@@ -1179,6 +1179,7 @@ function updateUI(){if(!proj)return;
   else sub.classList.add('hidden');
   const ab=(b,icon,label,cls)=>`<button data-b="${b}" class="${cls||''}">${ic(icon)}<span>${label}</span></button>`;const a=[];
   if(n){a.push(`<button data-b="x" class="cnt" title="Снять выбор">✕ ${n}</button>`);
+    if(moveMode)a.push(ab('mv','move','Двигать','on'));
     if(multi)a.push(ab('m','select','Неск.','on'));
     if(one&&(isMeas(one)||one.type==='text'))a.push(ab('e','edit','Текст'));
     if(L.some(o=>isDim(o)||o.type==='angle'))a.push(ab('f','flip','Перевер.'));
@@ -1188,12 +1189,12 @@ function updateUI(){if(!proj)return;
   const bar=$('#ctxBar');bar.innerHTML=a.join('');bar.classList.toggle('hidden',!a.length);if(!a.length)closeMore();}
 function closeMore(){const m=$('#morePop');if(m)m.classList.add('hidden');}
 function moreMenu(btn){const pop=$('#morePop');if(!pop.classList.contains('hidden')){closeMore();return;}
-  const L=selList(),one=L.length===1?L[0]:null,o=[['st','style','Стиль'],['c','copy','Копия']];
+  const L=selList(),one=L.length===1?L[0]:null,o=[['mv','move','Переместить',moveMode],['st','style','Стиль'],['c','copy','Копия']];
   if(one&&one.type==='angle')o.push(['g','rays',one.rays===false?'Стороны':'Без сторон']);
   o.push(['m','select','Несколько',multi],['a','all','Все']);
   pop.innerHTML=o.map(([k,i,l,on])=>`<button data-k="${k}" class="${on?'on':''}">${ic(i)}<span>${l}</span></button>`).join('');pop.classList.remove('hidden');
   pop.onclick=e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.k;closeMore();
-    if(k==='st')quickStyle();else if(k==='c')dupSel();else if(k==='g')toggleRays();
+    if(k==='mv'){moveMode=!moveMode;updateUI();if(moveMode)toast('Перетащите выделенное за любое место');}else if(k==='st')quickStyle();else if(k==='c')dupSel();else if(k==='g')toggleRays();
     else if(k==='m'){multi=!multi;updateUI();render();}else if(k==='a'){multi=true;dims.forEach(d=>selSet.add(d.id));updateUI();render();}};}
 document.addEventListener('pointerdown',e=>{const m=$('#morePop');if(m&&!m.classList.contains('hidden')&&!e.target.closest('#morePop')&&!e.target.closest('[data-b=more]'))closeMore();},true);
 
@@ -1413,7 +1414,7 @@ cv.addEventListener('pointerdown',e=>{
   const h=hitHandle(p);
   if(h){const d=selDim(),ip=toImg(p);act={k:'handle',h:h.k,d,snap:JSON.stringify(d),before:JSON.stringify(dims),gx:h.x-ip.x,gy:h.y-ip.y,touchy};handleMove(p);return;}
   const hit=hitObj(p);let targets=null,part=null;
-  if(hit&&selSet.has(hit.id)){targets=selList();if(targets.length===1&&hit.type==='text'&&hit.tip&&inLabel(hit,toImg(p)))part='text';}
+  if(hit&&selSet.has(hit.id)&&(moveMode||!selList().some(isMeas))){targets=selList();if(targets.length===1&&hit.type==='text'&&hit.tip&&inLabel(hit,toImg(p)))part='text';}
   act={k:'tap',start:p,last:p,mod:e.ctrlKey||e.shiftKey||e.metaKey,targets,part};});
 cv.addEventListener('pointermove',e=>{
   if(!ptrs.has(e.pointerId)){if(proj&&mode==='create'&&tmpP2&&e.pointerType==='mouse')offsetAt(pos(e));return;}
@@ -1467,9 +1468,9 @@ async function commitPending(){const d=pendingDim;if(!d)return;
   d.text=v;rememberText(v);pushHistory();dims.push(d);selSet=new Set([d.id]);changed();}
 function doTap(p,mod){const d=hitObj(p),now=Date.now();
   if(multi||mod){if(d){selSet.has(d.id)?selSet.delete(d.id):selSet.add(d.id);}lastTap={t:0,id:null};}
-  else if(d){const one=selDim();if(one&&one.id===d.id&&lastTap.id===d.id&&now-lastTap.t<400){lastTap={t:0,id:null};editText();return;}
+  else if(d){if(!selSet.has(d.id))moveMode=false;const one=selDim();if(one&&one.id===d.id&&lastTap.id===d.id&&now-lastTap.t<400){lastTap={t:0,id:null};editText();return;}
     selSet=new Set([d.id]);lastTap={t:now,id:d.id};}
-  else{selSet.clear();lastTap={t:0,id:null};}
+  else{selSet.clear();moveMode=false;lastTap={t:0,id:null};}
   updateUI();render();}
 
 document.addEventListener('keydown',e=>{
