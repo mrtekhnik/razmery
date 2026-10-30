@@ -87,10 +87,17 @@ header.top h1{font-size:18px;margin:0 6px;flex:1;white-space:nowrap;overflow:hid
 .seg button.on{background:var(--accent);color:#fff}
 #toast{position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#222a33;color:#fff;padding:10px 16px;border-radius:20px;z-index:60;font-size:14px;max-width:90%;text-align:center;pointer-events:none}
 .tool span{white-space:nowrap;font-size:11px}
-#ctxBar{position:absolute;left:8px;bottom:8px;right:60px;display:flex;flex-wrap:wrap-reverse;gap:6px;align-items:center}
-#ctxBar::-webkit-scrollbar{display:none}
-#ctxBar .cnt,#ctxBar button{flex:none;height:38px;padding:0 12px;border-radius:20px;background:rgba(20,25,32,.82);color:#fff;font-size:14px;display:flex;align-items:center;white-space:nowrap}
-#ctxBar button.on{background:var(--accent)}
+#ctxBar{position:absolute;left:6px;bottom:8px;right:56px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;pointer-events:none}
+#ctxBar>div{display:flex;gap:2px;flex-wrap:wrap;pointer-events:auto}
+#ctxBar .kinds{background:rgba(20,25,32,.85);border-radius:12px;padding:3px}
+#ctxBar .kinds button{min-width:44px;height:38px;padding:0 10px;border-radius:9px;color:#fff;font-size:17px;font-weight:600}
+#ctxBar .kinds button.on{background:var(--accent)}
+#ctxBar .acts{background:rgba(20,25,32,.85);border-radius:12px;padding:3px}
+#ctxBar .acts button{width:46px;height:50px;border-radius:9px;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:9.5px;line-height:1.1;letter-spacing:-.2px}
+#ctxBar .acts button svg.i{width:21px;height:21px}
+#ctxBar .acts button.on{background:var(--accent)}
+#ctxBar .acts .cnt{width:auto;min-width:36px;padding:0 5px;font-size:13px;font-weight:700}
+#ctxBar .acts .dng{color:#ff8a80}
 #ctxBar .sep{flex:none;width:1px;height:26px;background:rgba(255,255,255,.35)}
 #edNote{position:relative}
 #hint{pointer-events:auto;cursor:pointer}
@@ -179,6 +186,7 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
 .pgTools{display:flex;gap:6px;align-items:center;margin-top:8px}
 .pgTools input{flex:1;height:40px;border:1px solid var(--line);border-radius:10px;padding:0 10px;font:inherit;font-size:15px;min-width:0}
 .pgTools button{height:40px;padding:0 12px;border-radius:10px;background:#eef2f7;font-size:14px;font-weight:600}
+.mbtns.stick{position:sticky;bottom:-18px;background:var(--card);margin:12px -18px -18px;padding:12px 18px;border-top:1px solid var(--line);border-radius:0 0 16px 16px;z-index:1}
 #busy{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center}
 #busy span{background:#fff;padding:14px 22px;border-radius:12px}
 </style>
@@ -251,7 +259,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.18',APP_DATE='29.10.2026';
+const APP_VERSION='1.19',APP_DATE='29.10.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -260,7 +268,7 @@ text:'M5 7V4h14v3M12 4v16M9 20h6',trash:'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-1
 style:'M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3c2.6 0 4.7-2.1 4.7-4.7C22 5.9 17.5 3 12 3zM7.5 11h.01M10.5 7h.01M15.5 7.5h.01',
 plus:'M12 5v14M5 12h14',minus:'M5 12h14',fit:'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
 camera:'M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',image:'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4',
-dots:'M12 5h.01M12 12h.01M12 19h.01',pdf:'M6 2h9l5 5v15H6zM14 2v6h6M9 13h2a1.5 1.5 0 0 1 0 3H9v-5M9 16v2',crop:'M6 2v14a2 2 0 0 0 2 2h14M18 22V8a2 2 0 0 0-2-2H2',stitch:'M3 5h8v14H3zM13 5h8v14h-8z',sync:'M20 12a8 8 0 0 1-14 5.3M4 12a8 8 0 0 1 14-5.3M18 3v4h-4M6 21v-4h4',folder:'M3 6h6l2 2h10v11H3z',restore:'M4 12a8 8 0 1 0 2.5-5.8M4 4v4h4',flip:'M7 20V4M3 8l4-4 4 4M17 4v16M13 16l4 4 4-4',note:'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5',pen:'M4 20l4-1 11-11-3-3L5 16zM14 6l3 3',edit:'M4 20h4L19 9l-4-4L4 16zM14 6l4 4'};
+select:'M4 4h6M14 4h6M4 20h6M14 20h6M4 4v6M4 14v6M20 4v6M20 14v6',dots:'M12 5h.01M12 12h.01M12 19h.01',more:'M5 12h.01M12 12h.01M19 12h.01',copy:'M9 9h11v11H9zM5 15H4V4h11v1',shelf:'M4 19l7-8h9M12 7h7',close:'M6 6l12 12M18 6L6 18',pdf:'M6 2h9l5 5v15H6zM14 2v6h6M9 13h2a1.5 1.5 0 0 1 0 3H9v-5M9 16v2',crop:'M6 2v14a2 2 0 0 0 2 2h14M18 22V8a2 2 0 0 0-2-2H2',stitch:'M3 5h8v14H3zM13 5h8v14h-8z',sync:'M20 12a8 8 0 0 1-14 5.3M4 12a8 8 0 0 1 14-5.3M18 3v4h-4M6 21v-4h4',folder:'M3 6h6l2 2h10v11H3z',restore:'M4 12a8 8 0 1 0 2.5-5.8M4 4v4h4',flip:'M7 20V4M3 8l4-4 4 4M17 4v16M13 16l4 4 4-4',note:'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5',pen:'M4 20l4-1 11-11-3-3L5 16zM14 6l3 3',edit:'M4 20h4L19 9l-4-4L4 16zM14 6l4 4'};
 const ic=n=>`<svg class="i" viewBox="0 0 24 24"${n==='dots'?' style="stroke-width:3.5"':''}><path d="${ICONS[n]}"/></svg>`;
 document.querySelectorAll('[data-ic]').forEach(el=>el.insertAdjacentHTML('afterbegin',ic(el.dataset.ic)));
 
@@ -301,6 +309,12 @@ function toast(m){const t=$('#toast');t.textContent=m;t.classList.remove('hidden
 function busy(on,msg){$('#busy span').textContent=msg||'Подождите…';$('#busy').classList.toggle('hidden',!on);}
 function loadImg(blob){return new Promise((res,rej)=>{const u=URL.createObjectURL(blob);const im=new Image();
   im.onload=()=>{if(im.decode)im.decode().then(()=>res(im),()=>res(im));else res(im);};im.onerror=()=>{URL.revokeObjectURL(u);rej(new Error('img'));};im.src=u;});}
+function freeSm(x){try{if(x.close)x.close();else{x.width=x.height=0;}}catch(e){}}
+function imgSize(blob){return new Promise((res,rej)=>{const u=URL.createObjectURL(blob),im=new Image();im.onload=()=>{const r={w:im.naturalWidth,h:im.naturalHeight};URL.revokeObjectURL(u);res(r);};
+  im.onerror=()=>{URL.revokeObjectURL(u);rej(new Error('img'));};im.src=u;});}
+async function smallImage(blob,w,h,max=1600){const k=Math.min(1,max/Math.max(w,h)),rw=Math.max(1,Math.round(w*k)),rh=Math.max(1,Math.round(h*k));
+  if(window.createImageBitmap){try{const b=await createImageBitmap(blob,{resizeWidth:rw,resizeHeight:rh,resizeQuality:'high',imageOrientation:'from-image'});if(b.width===rw&&b.height===rh)return b;b.close&&b.close();}catch(e){}}
+  const im=await loadImg(blob);const c=document.createElement('canvas');c.width=rw;c.height=rh;c.getContext('2d').drawImage(im,0,0,rw,rh);URL.revokeObjectURL(im.src);return c;}
 async function makePreview(im,w,h){const k=Math.min(1,1280/Math.max(w,h)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(w*k));c.height=Math.max(1,Math.round(h*k));
   const x=c.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(im,0,0,c.width,c.height);const b=await toBlob(c,'image/jpeg',0.85);c.width=c.height=0;return b;}
 const toBlob=(c,type,q)=>new Promise(res=>c.toBlob(res,type,q));
@@ -546,7 +560,7 @@ async function makeThumb(im,p,ds){const k=Math.min(1,360/Math.max(p.w,p.h));cons
   return await toBlob(c,'image/jpeg',0.8);}
 
 /* ---------- библиотеки PDF (загружаются по требованию, хранятся офлайн) ---------- */
-let pdfjsP=null,pdflibP=null;
+let pdfjsP=null,pdflibP=null,freshPdf=null;
 function loadPdfjs(){if(!pdfjsP)pdfjsP=import('./lib/pdf.min.mjs').then(m=>{m.GlobalWorkerOptions.workerSrc=new URL('./lib/pdf.worker.min.mjs',location.href).href;return m;}).catch(e=>{pdfjsP=null;throw e;});return pdfjsP;}
 function loadPdfLib(){if(!pdflibP)pdflibP=new Promise((res,rej)=>{if(window.PDFLib)return res(window.PDFLib);const sc=document.createElement('script');sc.src='./lib/pdf-lib.min.js';
   sc.onload=()=>res(window.PDFLib);sc.onerror=()=>{pdflibP=null;rej(new Error('lib'));};document.head.appendChild(sc);});return pdflibP;}
@@ -556,7 +570,7 @@ function parseRange(t,n){const out=new Set();for(const part of t.split(/[,; ]+/)
 async function renderPdfPage(page,dpi){const v1=page.getViewport({scale:1});let sc=dpi/72;const lim=Math.min(1,Math.sqrt(30e6/(v1.width*sc*v1.height*sc)),12000/(Math.max(v1.width,v1.height)*sc));sc*=lim;
   const vp=page.getViewport({scale:sc}),c=document.createElement('canvas');c.width=Math.round(vp.width);c.height=Math.round(vp.height);const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
   await page.render({canvasContext:x,viewport:vp,background:'rgb(255,255,255)'}).promise;return {c,pw:v1.width,ph:v1.height};}
-async function canvasToStored(c){let b=await toBlob(c,'image/png');if(!b||b.size>5e6){const j=await toBlob(c,'image/jpeg',0.92);if(j&&(!b||j.size<b.size))b=j;}return b;}
+async function canvasToStored(c){let b=await toBlob(c,'image/webp',0.95);if(!b||b.type!=='image/webp')b=await toBlob(c,'image/jpeg',0.93);return b;}
 async function importPdf(file){let lib,doc;busy(true,'Открытие PDF…');
   try{lib=await loadPdfjs();}catch(e){busy(false);alertBox('PDF',libErr);return;}
   try{doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;}catch(e){busy(false);alertBox('PDF',e&&e.name==='PasswordException'?'PDF защищён паролем — такой файл открыть нельзя.':'Не удалось открыть PDF: файл повреждён или не поддерживается.');return;}
@@ -565,11 +579,11 @@ async function importPdf(file){let lib,doc;busy(true,'Открытие PDF…');
   const res=await modal((box,close)=>{
     box.innerHTML=`<h3>Загрузка PDF</h3><p class="note">${n} ${plural(n,'лист','листа','листов')}. Отметьте нужные касанием или введите номера.</p>
     <input class="inp sm nm" placeholder="Название">
-    <div class="pgTools"><input class="rg" placeholder="Напр. 1-3, 5" inputmode="numeric"><button class="ra">Все</button><button class="rn">Снять</button></div>
+    <div class="seg md"><button data-m="grp">Вместе — один документ</button><button data-m="sep">Отдельные проекты</button></div>
+    <div class="seg dq"><button data-q="200">Обычное качество</button><button data-q="300">Высокое</button></div>
+    <div class="pgTools"><input class="rg" placeholder="Листы, напр. 1-3, 5" inputmode="numeric"><button class="ra">Все</button><button class="rn">Снять</button></div>
     <div class="pgGrid"></div>
-    <div class="lbl">Как загрузить</div><div class="seg md"><button data-m="grp">Вместе — один документ</button><button data-m="sep">Отдельные проекты</button></div>
-    <div class="lbl">Качество</div><div class="seg dq"><button data-q="200">Обычное</button><button data-q="300">Высокое</button></div>
-    <div class="mbtns"><button class="btn" data-a="c">Отмена</button><button class="btn pri go"></button></div>`;
+    <div class="mbtns stick"><button class="btn" data-a="c">Отмена</button><button class="btn pri go"></button></div>`;
     const q=x=>box.querySelector(x);q('.nm').value=base;const grid=q('.pgGrid');
     const upd=()=>{grid.querySelectorAll('.pg').forEach(el=>el.classList.toggle('on',sel.has(+el.dataset.i)));q('.go').textContent=`Загрузить (${sel.size})`;q('.go').disabled=!sel.size;
       box.querySelectorAll('.md button').forEach(b=>b.classList.toggle('on',b.dataset.m===mode));box.querySelectorAll('.dq button').forEach(b=>b.classList.toggle('on',+b.dataset.q===settings.pdfIn.dpi));};
@@ -591,23 +605,27 @@ async function importPdf(file){let lib,doc;busy(true,'Открытие PDF…');
   try{await dbPut('files',{id:fileId,blob:new Blob([file],{type:'application/pdf'}),name:file.name||res.name+'.pdf'});
     if(mode==='sep'&&pages.length>1&&fDepth(curFolder)<3){const f={id:uid(),name:res.name,parent:curFolder,mod:Date.now()};folders.push(f);await saveFolders();folderId=f.id;}
     for(let k=0;k<pages.length;k++){const i=pages[k];busy(true,`Лист ${k+1} из ${pages.length}…`);
-      const pg=await doc.getPage(i+1),r=await renderPdfPage(pg,settings.pdfIn.dpi);const blob=await canvasToStored(r.c);r.c.width=r.c.height=0;
-      const im=await loadImg(blob),now=Date.now(),id=uid();
-      const p={id,name:pages.length>1?`${res.name} — лист ${i+1}`:res.name,created:now,modified:now,w:im.naturalWidth,h:im.naturalHeight,dims:[],folderId,src:{f:fileId,pg:i,pw:r.pw,ph:r.ph}};
+      const pg=await doc.getPage(i+1),r=await renderPdfPage(pg,settings.pdfIn.dpi);const blob=await canvasToStored(r.c);pg.cleanup();
+      const im=r.c,now=Date.now(),id=uid();
+      const p={id,name:pages.length>1?`${res.name} — лист ${i+1}`:res.name,created:now,modified:now,w:im.width,h:im.height,dims:[],folderId,src:{f:fileId,pg:i,pw:r.pw,ph:r.ph}};
       if(grpId)p.grp={id:grpId,name:res.name,n:k};
-      p.thumb=await makeThumb(im,p,[]);const preview=await makePreview(im,p.w,p.h);URL.revokeObjectURL(im.src);
+      p.thumb=await makeThumb(im,p,[]);const preview=await makePreview(im,p.w,p.h);im.width=im.height=0;
       await dbPutMany([['projects',p],['photos',{id,blob,preview,previewKey:''}]]);ids.push(id);}
     busy(false);doc.destroy();
-    if(ids.length===1||grpId)openEditor(ids[0]);else{if(folderId!==curFolder)navPush(folderId);else renderList();toast(`Загружено листов: ${ids.length}`);}}
+    if(ids.length===1||grpId){freshPdf={ids:ids.slice(),fileId,t:Date.now()};openEditor(ids[0]);}else{if(folderId!==curFolder)navPush(folderId);else renderList();toast(`Загружено листов: ${ids.length}`);}}
   catch(e){busy(false);doc.destroy();if(ids.length)renderList();alertBox('Ошибка',`Не удалось загрузить все листы (загружено: ${ids.length}). Возможно, не хватает памяти — попробуйте качество «Обычное».`);}}
 $('#btnPdf').onclick=()=>$('#fPdf').click();
 $('#fPdf').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)importPdf(f);};
 
 /* ---------- экспорт PDF поверх оригинала ---------- */
-function overlayCanvas(p,objs){const ow=p.xf?p.xf.ow:p.w,oh=p.xf?p.xf.oh:p.h,s=Math.min(1,Math.sqrt(30e6/(ow*oh)));
-  const c=document.createElement('canvas');c.width=Math.max(1,Math.round(ow*s));c.height=Math.max(1,Math.round(oh*s));const x=c.getContext('2d');x.scale(s,s);
+function overlayCanvas(p,objs){const ow=p.xf?p.xf.ow:p.w,oh=p.xf?p.xf.oh:p.h,inv=p.xf?xfInv(p.xf):(x,y)=>[x,y];
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  for(const o of objs){const b=objBounds(o),m=(o.fs||10)*1.5+(o.lw||2)*4;for(const [x,y] of [[b.x0-m,b.y0-m],[b.x1+m,b.y0-m],[b.x0-m,b.y1+m],[b.x1+m,b.y1+m]]){const q=inv(x,y);x0=Math.min(x0,q[0]);y0=Math.min(y0,q[1]);x1=Math.max(x1,q[0]);y1=Math.max(y1,q[1]);}}
+  x0=Math.max(0,Math.floor(x0));y0=Math.max(0,Math.floor(y0));x1=Math.min(ow,Math.ceil(x1));y1=Math.min(oh,Math.ceil(y1));if(!(x1>x0&&y1>y0))return null;
+  const bw=x1-x0,bh=y1-y0,s=Math.min(1,Math.sqrt(30e6/(bw*bh)));
+  const c=document.createElement('canvas');c.width=Math.max(1,Math.round(bw*s));c.height=Math.max(1,Math.round(bh*s));const x=c.getContext('2d');x.scale(s,s);x.translate(-x0,-y0);
   if(p.xf){const B=rotBox(p.xf.ow,p.xf.oh,p.xf.r);x.translate(ow/2,oh/2);x.rotate(-p.xf.r*Math.PI/180);x.translate(p.xf.c[0]*B.W-B.W/2,p.xf.c[1]*B.H-B.H/2);}
-  for(const o of objs)drawObj(x,o);return c;}
+  for(const o of objs)drawObj(x,o);c.box={fx:x0/ow,fy:y0/oh,fw:bw/ow,fh:bh/oh};return c;}
 async function sheetsPdf(sheets,mode){
   const out=[],files={};let lib=null,doc=null,fallback=0;
   if(mode==='over'){try{lib=await loadPdfLib();}catch(e){throw new Error(libErr);}doc=await lib.PDFDocument.create();}
@@ -617,12 +635,13 @@ async function sheetsPdf(sheets,mode){
     if(mode==='over'&&p.src){let src=files[p.src.f];
       if(src===undefined){const f=await dbGet('files',p.src.f);try{src=f?await lib.PDFDocument.load(await f.blob.arrayBuffer(),{ignoreEncryption:true}):null;}catch(e){src=null;}files[p.src.f]=src;}
       if(src&&p.src.pg<src.getPageCount()){const [pg]=await doc.copyPages(src,[p.src.pg]);doc.addPage(pg);
-        if((p.dims||[]).length){const oc=overlayCanvas(p,p.dims);const png=await toBlob(oc,'image/png');oc.width=oc.height=0;const em=await doc.embedPng(new Uint8Array(await png.arrayBuffer()));
+        const oc=(p.dims||[]).length?overlayCanvas(p,p.dims):null;
+        if(oc){const png=await toBlob(oc,'image/png');const bx=oc.box;oc.width=oc.height=0;const em=await doc.embedPng(new Uint8Array(await png.arrayBuffer()));
           const cb=pg.getCropBox(),rot=((pg.getRotation().angle%360)+360)%360,D=lib.degrees;
-          if(rot===90)pg.drawImage(em,{x:cb.x+cb.width,y:cb.y,width:cb.height,height:cb.width,rotate:D(90)});
-          else if(rot===180)pg.drawImage(em,{x:cb.x+cb.width,y:cb.y+cb.height,width:cb.width,height:cb.height,rotate:D(180)});
-          else if(rot===270)pg.drawImage(em,{x:cb.x,y:cb.y+cb.height,width:cb.height,height:cb.width,rotate:D(270)});
-          else pg.drawImage(em,{x:cb.x,y:cb.y,width:cb.width,height:cb.height});}
+          let X,Y,IW,IH;if(rot===90){X=cb.x+cb.width;Y=cb.y;IW=cb.height;IH=cb.width;}else if(rot===180){X=cb.x+cb.width;Y=cb.y+cb.height;IW=cb.width;IH=cb.height;}
+          else if(rot===270){X=cb.x;Y=cb.y+cb.height;IW=cb.height;IH=cb.width;}else{X=cb.x;Y=cb.y;IW=cb.width;IH=cb.height;}
+          const a0=bx.fx*IW,b0=(1-bx.fy-bx.fh)*IH,t=rot*Math.PI/180,co=Math.round(Math.cos(t)),si=Math.round(Math.sin(t));
+          pg.drawImage(em,{x:X+a0*co-b0*si,y:Y+a0*si+b0*co,width:bx.fw*IW,height:bx.fh*IH,rotate:D(rot)});}
         done=true;}
       else fallback++;}
     if(!done){const ph=await dbGet('photos',p.id);const im=await baseImage(p,ph);
@@ -731,6 +750,8 @@ function renderBkLine(live){const el=$('#bkLine'),t=bkInfo.lastExport;
   el.querySelector('span').textContent=t?`Изменено проектов с последней копии: ${changed}. Копия была ${daysAgo(t)}`:'Резервная копия ещё не создавалась';}
 $('#bkNow').onclick=()=>exportBackup();
 let thumbUrls=[];
+function sortFn(){const nm=(a,b)=>a.name.localeCompare(b.name,'ru',{numeric:true});
+  return {name:nm,nameDesc:(a,b)=>-nm(a,b),dateAsc:(a,b)=>a.modified-b.modified}[settings.sort]||((a,b)=>b.modified-a.modified);}
 let searchQ='',folders=[],curFolder=null,trashView=false,navStack=[],selMode=false,selProj=new Set(),lastPs=[];
 const TRASH_DAYS=30;
 async function loadFolders(){try{const r=await dbGet('meta','folders');folders=(r&&Array.isArray(r.value))?r.value:[];}catch(e){folders=[];}}
@@ -768,9 +789,10 @@ async function renderList(){
     chip('Выбрать все',()=>{here.forEach(p=>selProj.add(p.id));renderList();});chip('Снять выбор',()=>{selProj.clear();renderList();});
     chip('Готово',()=>{selMode=false;selProj.clear();renderList();},'on');}
   else{chip('＋ Папка',newFolder).disabled=fDepth(curFolder)>=3;chip('Выбрать',()=>{selMode=true;selProj.clear();renderList();});
-    chip(settings.sort==='name'?'А–Я':'↓ Дата',()=>{settings.sort=settings.sort==='name'?'date':'name';saveSettings();renderList();}).title='Сортировка';
+    const SORTS={date:'↓ Дата',dateAsc:'↑ Дата',name:'А–Я',nameDesc:'Я–А'};
+    chip(SORTS[settings.sort]||SORTS.date,async()=>{const k=await choose('Сортировка','',[{k:'date',l:'Дата: сначала новые'},{k:'dateAsc',l:'Дата: сначала старые'},{k:'name',l:'Имя: А → Я'},{k:'nameDesc',l:'Имя: Я → А'}]);if(k){settings.sort=k;saveSettings();renderList();}}).title='Сортировка';
     chip('▦ '+(settings.gridCols||2),()=>{settings.gridCols=(settings.gridCols||2)%4+1;if(settings.gridCols<2)settings.gridCols=2;saveSettings();renderList();}).title='Карточек в строке';
-    if(!curFolder)chip(inTrash.length?`Корзина (${inTrash.length})`:'Корзина',()=>navPush('trash'));}
+}
   renderBkLine(live);if(trashView||selMode||searchQ)$('#bkLine').classList.add('hidden');
   $('#srch').classList.toggle('hidden',trashView||selMode);$('#srchX').classList.toggle('hidden',!searchQ);
   {const t=syncState.lastSync,cfg=syncCfg();const ch=[];if(cfg&&t){all.forEach(p=>{if(p.modified>t)ch.push(p.modified);});Object.values(purged).forEach(v=>ch.push(v));folders.forEach(f=>{if((f.mod||0)>t)ch.push(f.mod);});Object.values(folderTomb).forEach(v=>{if(v>t)ch.push(v);});}
@@ -785,11 +807,11 @@ async function renderList(){
     folders.filter(f=>f.name.toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name,'ru')).forEach(f=>list.appendChild(folderCard(f,live)));}
   else{items=live.filter(p=>(p.folderId||null)===curFolder);
     folders.filter(f=>(f.parent||null)===curFolder).sort((a,b)=>a.name.localeCompare(b.name,'ru')).forEach(f=>list.appendChild(folderCard(f,live)));}
-  if(!trashView)items.sort(settings.sort==='name'?(a,b)=>a.name.localeCompare(b.name,'ru',{numeric:true}):(a,b)=>b.modified-a.modified);
+  if(!trashView)items.sort(sortFn());
   if(!trashView){const gm=new Map(),out=[];for(const p of items){if(p.grp&&p.grp.id){let g=gm.get(p.grp.id);
       if(!g){g={...p,name:p.grp.name,_g:{id:p.grp.id,sheets:[]}};gm.set(p.grp.id,g);out.push(g);}g._g.sheets.push(p);}else out.push(p);}
     for(const g of gm.values()){g._g.sheets.sort((a,b)=>a.grp.n-b.grp.n);const f=g._g.sheets[0];g.id=f.id;g.thumb=f.thumb;g.modified=Math.max(...g._g.sheets.map(x=>x.modified));g.created=Math.min(...g._g.sheets.map(x=>x.created));}
-    if(gm.size)out.sort(settings.sort==='name'?(a,b)=>a.name.localeCompare(b.name,'ru',{numeric:true}):(a,b)=>b.modified-a.modified);items=out;}
+    if(gm.size)out.sort(sortFn());items=out;}
   for(const p of items)list.appendChild(projCard(p));
   const em=$('#emptyMsg');em.classList.toggle('hidden',list.children.length>0);
   em.innerHTML=trashView?`Корзина пуста.<br>Удалённые проекты хранятся здесь ${TRASH_DAYS} дней.`:curFolder?'Папка пуста.<br>Загрузите фото или переместите сюда проекты.':'Проектов пока нет.<br>Загрузите фото из галереи или сделайте снимок.';
@@ -1008,22 +1030,22 @@ $('#btnCamera').onclick=()=>$('#fCamera').click();
 for(const id of ['#fGallery','#fCamera'])$(id).onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)newProject(f);};
 async function newProject(file){
   busy(true,'Загрузка фото…');
-  let im=null;
-  try{const blob=file.slice(0,file.size,file.type||'image/jpeg');im=await loadImg(blob);
-    const w=im.naturalWidth,h=im.naturalHeight;if(!w||!h)throw new Error('size');
+  let sm=null;
+  try{const blob=file.slice(0,file.size,file.type||'image/jpeg');const {w,h}=await imgSize(blob);if(!w||!h)throw new Error('size');
+    sm=await smallImage(blob,w,h);
     const now=Date.now(),id=uid();const p={id,name:'Фото '+fmtDate(now),created:now,modified:now,w,h,dims:[],folderId:curFolder};
     busy(false);let xf=null;
-    if(settings.adjustOnLoad!==false){const r=await adjustImage(im,w,h,{title:'Новый проект',ok:'Создать',name:settings.askName!==false?p.name:undefined});
-      if(!r){URL.revokeObjectURL(im.src);return;}xf=r.xf;if(r.name)p.name=r.name;}
-    else if(settings.askName!==false){const v=await askText('Название проекта',p.name,{placeholder:'Например: Кронштейн, заказ 125'});if(v===null){URL.revokeObjectURL(im.src);return;}if(v)p.name=v;}
-    busy(true,'Сохранение…');let base=im,work=null;
-    if(xf){p.xf=xf;const r=await imgFromCanvas(applyXf(im,xf));base=r.im;work=r.blob;p.w=base.naturalWidth;p.h=base.naturalHeight;}
+    if(settings.adjustOnLoad!==false){const r=await adjustImage(sm,w,h,{title:'Новый проект',ok:'Создать',name:settings.askName!==false?p.name:undefined});
+      if(!r){freeSm(sm);return;}xf=r.xf;if(r.name)p.name=r.name;}
+    else if(settings.askName!==false){const v=await askText('Название проекта',p.name,{placeholder:'Например: Кронштейн, заказ 125'});if(v===null){freeSm(sm);return;}if(v)p.name=v;}
+    busy(true,'Сохранение…');let base=sm,work=null,full=null;
+    if(xf){p.xf=xf;full=await loadImg(blob);const r=await imgFromCanvas(applyXf(full,xf));URL.revokeObjectURL(full.src);base=r.im;work=r.blob;p.w=base.naturalWidth;p.h=base.naturalHeight;}
     p.thumb=await makeThumb(base,p,[]);const preview=await makePreview(base,p.w,p.h);
-    if(base!==im)URL.revokeObjectURL(base.src);URL.revokeObjectURL(im.src);im=null;
+    if(base!==sm)URL.revokeObjectURL(base.src);freeSm(sm);sm=null;
     const ph={id,blob,preview,previewKey:xfKey(xf)};if(work){ph.work=work;ph.workKey=xfKey(xf);}
     await dbPutMany([['projects',p],['photos',ph]]);busy(false);
     openEditor(id);
-  }catch(e){busy(false);if(im)URL.revokeObjectURL(im.src);alertBox('Не удалось открыть изображение','Формат не поддерживается браузером или файл повреждён. Попробуйте JPG или PNG.');}}
+  }catch(e){busy(false);if(sm)freeSm(sm);alertBox('Не удалось открыть изображение','Формат не поддерживается браузером или файл повреждён. Попробуйте JPG или PNG.');}}
 
 /* ---------- редактор: состояние ---------- */
 let proj=null,img=null,dims=[],selSet=new Set(),multi=false,mode='select',tmpP1=null,tmpP2=null,pendingDim=null,undoSt=[],redoSt=[],loupe=null;
@@ -1064,6 +1086,11 @@ $('#sheetNav .sn').onclick=async()=>{const all=await Promise.all(sheetIds.map(id
 async function closeEditor(){
   if(!proj)return;cancelAct();pendingDim=null;
   await flushAll();
+  if(freshPdf&&freshPdf.ids.includes(proj.id)){const fp=freshPdf;freshPdf=null;const ps=(await Promise.all(fp.ids.map(id=>dbGet('projects',id)))).filter(Boolean);
+    const untouched=ps.length&&ps.every(x=>!(x.dims||[]).length&&!(x.comment||'').trim()&&!x.xf&&x.modified<=fp.t+1000);
+    if(untouched&&!await confirmBox('Сохранить PDF в проектах?',`Вы открыли «${ps[0].grp?ps[0].grp.name:ps[0].name}», но ничего не изменили.`,'Сохранить')){
+      URL.revokeObjectURL(img.src);img=null;proj=null;dims=[];await dbDelMany(ps.map(x=>x.id));await gcFiles();
+      $('#editor').classList.add('hidden');$('#listScreen').classList.remove('hidden');renderList();toast('Не сохранено');return;}}
   URL.revokeObjectURL(img.src);img=null;proj=null;dims=[];
   $('#editor').classList.add('hidden');$('#listScreen').classList.remove('hidden');renderList();}
 $('#edBack').onclick=()=>history.back();
@@ -1114,7 +1141,7 @@ $('#ctxBar').addEventListener('click',e=>{const b=e.target.closest('button');if(
   if(b.dataset.k){dimKind=b.dataset.k;mpts=[];tmpP1=null;tmpP2=null;pendingDim=null;pendingObj=null;}
   else if(b.dataset.t)tool=b.dataset.t;
   else if(b.dataset.l){labelMode=b.dataset.l;tmpTip=null;pendingObj=null;}
-  else{const k=b.dataset.b;if(k==='e'){editText();return;}if(k==='st'){quickStyle();return;}if(k==='c'){dupSel();return;}if(k==='s'){toggleShelf();return;}if(k==='g'){toggleRays();return;}if(k==='f'){flipSel();return;}if(k==='d'){delSel();return;}
+  else{const k=b.dataset.b;if(k==='more'){moreMenu();return;}if(k==='e'){editText();return;}if(k==='st'){quickStyle();return;}if(k==='c'){dupSel();return;}if(k==='s'){toggleShelf();return;}if(k==='g'){toggleRays();return;}if(k==='f'){flipSel();return;}if(k==='d'){delSel();return;}
     if(k==='m')multi=!multi;else if(k==='a'){multi=true;dims.forEach(d=>selSet.add(d.id));}else if(k==='x'){selSet.clear();multi=false;}}
   updateUI();render();});
 $('#tStyle').onclick=()=>openSettings();
@@ -1138,17 +1165,26 @@ function updateUI(){if(!proj)return;
   else h='Коснитесь объекта, чтобы выбрать · 1 палец — сдвиг фото, 2 — масштаб';
   $('#hint').textContent=h;$('#hint').classList.toggle('hidden',!!settings.hintOff);$('#hintQ').classList.toggle('hidden',!settings.hintOff);$('#edTitle').textContent=proj.name;
   const parts=[];
-  if(mode==='create')[['lin','Линейный'],['angle','Угол'],['diam','Диаметр'],['rad','Радиус']].forEach(([k,l])=>parts.push(`<button data-k="${k}" class="${dimKind===k?'on':''}">${l}</button>`));
-  if(mode==='draw')[['pen','Карандаш'],['arrow','Стрелка'],['oval','Овал'],['rect','Рамка']].forEach(([k,l])=>parts.push(`<button data-t="${k}" class="${tool===k?'on':''}">${l}</button>`));
-  if(mode==='text')[['plain','Текст'],['leader','С выноской']].forEach(([k,l])=>parts.push(`<button data-l="${k}" class="${labelMode===k?'on':''}">${l}</button>`));
-  if(n){if(parts.length)parts.push('<span class="sep"></span>');parts.push(`<button data-b="x" title="Снять выбор">✕ ${n}</button>`);
-    if(one&&(isMeas(one)||one.type==='text'))parts.push('<button data-b="e">Изменить</button>');
-    if(one&&isMeas(one)&&one.text)parts.push(`<button data-b="s" class="${one.shelf?'on':''}">${!one.shelf?'Полка':useLine(one)?'Полка: в линию':'Полка: выноска'}</button>`);
-    if(one&&one.type==='angle')parts.push(`<button data-b="g" class="${one.rays===false?'':'on'}">Стороны</button>`);
-    if(L.some(o=>isDim(o)||o.type==='angle'))parts.push('<button data-b="f">Перевернуть</button>');
-    parts.push('<button data-b="st">Стиль</button>','<button data-b="c">Копия</button>','<button data-b="d">Удалить</button>');}
-  if(mode==='select'&&(n||multi)){parts.push(`<button data-b="m" class="${multi?'on':''}">Несколько</button>`);if(multi)parts.push('<button data-b="a">Все</button>');if(!n)parts.push('<button data-b="x">✕</button>');}
+  const seg=(items,attr,cur)=>'<div class="kinds">'+items.map(([k,l,t])=>`<button data-${attr}="${k}" class="${cur===k?'on':''}" title="${t}">${l}</button>`).join('')+'</div>';
+  if(mode==='create')parts.push(seg([['lin','⟷','Линейный'],['angle','∠','Угол'],['diam','Ø','Диаметр'],['rad','R','Радиус']],'k',dimKind));
+  if(mode==='draw')parts.push(seg([['pen','✎','Карандаш'],['arrow','↗','Стрелка'],['oval','◯','Овал'],['rect','▭','Рамка']],'t',tool));
+  if(mode==='text')parts.push(seg([['plain','Т','Текст'],['leader','Т↙','С выноской']],'l',labelMode));
+  const ab=(b,icon,label,cls)=>`<button data-b="${b}" class="${cls||''}">${ic(icon)}<span>${label}</span></button>`;
+  if(n){const a=[`<button data-b="x" class="cnt" title="Снять выбор">✕ ${n}</button>`];
+    if(multi)a.push(ab('m','pointer','Несколько','on'));
+    if(one&&(isMeas(one)||one.type==='text'))a.push(ab('e','edit','Текст'));
+    if(L.some(o=>isDim(o)||o.type==='angle'))a.push(ab('f','flip','Перевер.'));
+    if(one&&isMeas(one)&&one.text)a.push(ab('s','shelf',!one.shelf?'Полка':useLine(one)?'В линию':'Выноска',one.shelf?'on':''));
+    a.push(ab('d','trash','Удалить','dng'),ab('more','more','Ещё'));
+    parts.push('<div class="acts">'+a.join('')+'</div>');}
+  else if(mode==='select'&&multi)parts.push('<div class="acts">'+ab('m','pointer','Несколько','on')+ab('a','select','Все')+'</div>');
   const bar=$('#ctxBar');bar.innerHTML=parts.join('');bar.classList.toggle('hidden',!parts.length);}
+async function moreMenu(){const L=selList(),one=L.length===1?L[0]:null;const o=[{k:'st',l:'Стиль (цвет, толщина, шрифт)'},{k:'c',l:'Копия'}];
+  if(one&&one.type==='angle')o.push({k:'g',l:one.rays===false?'Показать стороны угла':'Скрыть стороны угла'});
+  o.push({k:'m',l:multi?'Выключить выбор нескольких':'Выбрать несколько'},{k:'a',l:'Выбрать все'});
+  const k=await choose(`Выбрано: ${L.length}`,'',o);if(!k)return;
+  if(k==='st')quickStyle();else if(k==='c')dupSel();else if(k==='g')toggleRays();
+  else if(k==='m'){multi=!multi;updateUI();render();}else if(k==='a'){multi=true;dims.forEach(d=>selSet.add(d.id));updateUI();render();}}
 
 async function editText(){const o=selDim();if(!o)return;let v;
   if(isMeas(o))v=await askDimText(o.text,true);else if(o.type==='text')v=await askLabel(o.text);else return;
@@ -1583,43 +1619,46 @@ async function renderExport(fmt,withNote,P=proj,IM=img,OBJ=dims,maxSide=0){
   const H=c.height,blob=await toBlob(c,fmt==='png'?'image/png':'image/jpeg',0.92);c.width=c.height=0;if(!blob)throw new Error('blob');
   return {blob,w,h:H,scaled};}
 function canShareFiles(){try{return !!(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([new Blob(['x'],{type:'image/png'})],'t.png',{type:'image/png'})]}));}catch(e){return false;}}
+function exportPx(P,maxSide){const w=P.w,h=P.h,kl=Math.min(1,Math.sqrt(36e6/(w*h)),16000/Math.max(w,h)),k=Math.min(kl,maxSide?maxSide/Math.max(w,h):1);return {w:Math.round(w*k),h:Math.round(h*k)};}
 async function openExport(){
   if(!proj)return;cancelAct();if(fullPromise){busy(true,'Подготовка…');await fullPromise;busy(false);}if(!proj)return;await saveNow();
-  let fmt='jpg',blob=null,gen=0,withNote=!!proj.commentOnExport;const hasNote=!!(proj.comment||'').trim();const shareOK=canShareFiles();const fname=()=>safeName(fmt==='pdf'&&proj.grp&&settings.pdf.all!==false&&(settings.pdf.mode||'over')!=='page'?proj.grp.name:proj.name)+(fmt==='pdf'?'.pdf':'_размеры.'+fmt);
+  let fmt='jpg',withNote=!!proj.commentOnExport,cache=null;const hasNote=!!(proj.comment||'').trim();const shareOK=canShareFiles();
+  const srcP=!!(proj.src||proj.grp),pmode=()=>srcP?settings.pdf.mode||'over':'page',allSheets=()=>pmode()!=='page'&&settings.pdf.all!==false&&sheetIds&&sheetIds.length>1;
+  const fname=()=>safeName(fmt==='pdf'&&proj.grp&&allSheets()?proj.grp.name:proj.name)+(fmt==='pdf'?'.pdf':'_размеры.'+fmt);
+  const key=()=>JSON.stringify([fmt,withNote,settings.expSize,settings.pdf]);
+  const build=async()=>{const k=key();if(cache&&cache.k===k)return cache.blob;let blob,extra='';
+    busy(true,'Подготовка файла…');
+    try{if(fmt==='pdf'&&pmode()!=='page'){const list=allSheets()?(await Promise.all(sheetIds.map(id=>dbGet('projects',id)))).filter(Boolean):[{...proj,dims:clone(dims)}];
+        const r=await sheetsPdf(list,pmode());blob=r.blob;if(r.fallback)extra=` ${r.fallback} — картинкой: нет исходного PDF на этом устройстве.`;}
+      else if(fmt==='pdf'){blob=buildPdf([await pageJpeg(pdfPage(proj,img,dims,{...settings.pdf,note:withNote}))]);}
+      else blob=(await renderExport(fmt,withNote,proj,img,dims,settings.expSize||0)).blob;}
+    finally{busy(false);}
+    cache={k,blob};if(extra)toast(extra.trim());return blob;};
   await modal((box,close)=>{
     box.innerHTML=`<h3>Экспорт</h3><p class="note">Создаётся отдельная копия с размерами. Исходное фото в проекте не меняется.</p>
-    <div class="seg"><button data-f="jpg">JPG</button><button data-f="png">PNG</button><button data-f="pdf">PDF</button></div><div class="szw">${SIZE_SEG}</div>${proj.src||proj.grp?SRC_SEG:''}${PDF_SEG}${hasNote?'<label class="chk"><input type="checkbox" class="wn"> Комментарий полосой под фото</label>':''}<p class="note info">Подготовка…</p>
-    <button class="btn pri block sv" disabled>Сохранить на устройство</button>${shareOK?'<button class="btn block sh" disabled>Поделиться…</button>':''}
+    <div class="seg"><button data-f="jpg">JPG</button><button data-f="png">PNG</button><button data-f="pdf">PDF</button></div><div class="szw">${SIZE_SEG}</div>${srcP?SRC_SEG:''}${PDF_SEG}${hasNote?'<label class="chk"><input type="checkbox" class="wn"> Комментарий полосой под фото</label>':''}<p class="note info"></p>
+    <button class="btn pri block sv">Сохранить на устройство</button>${shareOK?'<button class="btn block sh">Поделиться…</button>':''}
     <button class="btn block ghost cl">Закрыть</button>`;
     const q=s=>box.querySelector(s);
-    const prep=async()=>{const my=++gen;blob=null;q('.sv').disabled=true;if(q('.sh'))q('.sh').disabled=true;q('.info').textContent='Подготовка…';
-      box.querySelectorAll('.seg button[data-f]').forEach(b=>b.classList.toggle('on',b.dataset.f===fmt));
-      const srcP=!!(proj.src||proj.grp),pm=srcP?settings.pdf.mode||'over':'page';
+    const prep=()=>{const pm=pmode();box.querySelectorAll('.seg button[data-f]').forEach(b=>b.classList.toggle('on',b.dataset.f===fmt));
       q('.szw').classList.toggle('hidden',fmt==='pdf');q('.pdfo').classList.toggle('hidden',fmt!=='pdf'||pm!=='page');
       if(q('.srco')){q('.srco').classList.toggle('hidden',fmt!=='pdf');box.querySelectorAll('.pm button').forEach(b=>b.classList.toggle('on',b.dataset.pm===pm));
         q('.alls').classList.toggle('hidden',!sheetIds||sheetIds.length<2||pm==='page');
         q('.pmn').textContent=pm==='over'?'Исходный PDF остаётся векторным, разметка накладывается поверх. Чёткость при любом увеличении.':pm==='img'?'Лист сохраняется картинкой в исходном размере страницы.':'Страница A4/A3 с названием, датой и комментарием.';}
-      try{if(fmt==='pdf'&&pm!=='page'){await saveNow();const all=settings.pdf.all!==false&&sheetIds&&sheetIds.length>1;
-          const list=all?(await Promise.all(sheetIds.map(id=>dbGet('projects',id)))).filter(Boolean):[{...proj,dims:clone(dims)}];
-          const r=await sheetsPdf(list,pm);if(my!==gen)return;blob=r.blob;
-          q('.info').textContent=`PDF, ${list.length} ${plural(list.length,'лист','листа','листов')}, ${(blob.size/1048576).toFixed(1)} МБ`+(r.fallback?` · ${r.fallback} — картинкой (нет исходного PDF на этом устройстве)`:'');}
-        else if(fmt==='pdf'){const pg=await pageJpeg(pdfPage(proj,img,dims,{...settings.pdf,note:withNote}));if(my!==gen)return;blob=buildPdf([pg]);
-          q('.info').textContent=`PDF, ${settings.pdf.paper.toUpperCase()}, ${(blob.size/1048576).toFixed(1)} МБ`;}
-        else{const r=await renderExport(fmt,withNote,proj,img,dims,settings.expSize||0);if(my!==gen)return;blob=r.blob;
-        q('.info').textContent=`${r.w} × ${r.h} пикс., ${(blob.size/1048576).toFixed(1)} МБ`+(r.scaled?' — уменьшено из-за ограничений браузера':'');}
-        q('.sv').disabled=false;if(q('.sh'))q('.sh').disabled=false;}
-      catch(e){busy(false);if(my===gen&&q('.info'))q('.info').textContent=e&&e.message===libErr?libErr:'Не удалось создать файл (не хватает памяти?)';}};
+      let t;if(fmt==='pdf'){if(pm==='page')t=`PDF, ${settings.pdf.paper.toUpperCase()}`;else{const n=allSheets()?sheetIds.length:1;t=`PDF, ${n} ${plural(n,'лист','листа','листов')}`;}}
+      else{const r=exportPx(proj,settings.expSize||0);t=`${r.w} × ${r.h} пикс.`;}
+      q('.info').textContent=t+' · файл создаётся при сохранении';};
     box.querySelectorAll('.seg button[data-f]').forEach(b=>b.onclick=()=>{fmt=b.dataset.f;prep();});
-    if(proj.src&&!proj.grp&&fmt==='jpg'){}
     bindSizeSeg(box,prep);bindPdfSeg(box,prep);
     box.querySelectorAll('.pm button').forEach(b=>b.onclick=()=>{settings.pdf={...settings.pdf,mode:b.dataset.pm};saveSettings();prep();});
     if(q('.all')){q('.all').checked=settings.pdf.all!==false;q('.all').onchange=e=>{settings.pdf={...settings.pdf,all:e.target.checked};saveSettings();prep();};}
     if(q('.wn')){q('.wn').checked=withNote;q('.wn').onchange=e=>{withNote=e.target.checked;prep();};}
-    q('.sv').onclick=()=>{if(blob){download(blob,fname());toast('Файл сохранён');}};
-    if(q('.sh'))q('.sh').onclick=async()=>{if(!blob)return;try{await navigator.share({files:[new File([blob],fname(),{type:blob.type})],title:proj.name});}
-      catch(e){if(e.name!=='AbortError')toast('Не удалось поделиться');}};
-    q('.cl').onclick=()=>close(null);prep();});
-  gen++;}
+    const fail=e=>alertBox('Не удалось создать файл',e&&e.message===libErr?libErr:'Возможно, не хватает памяти. Попробуйте меньший размер или качество.');
+    q('.sv').onclick=async()=>{try{const b=await build();download(b,fname());toast(`Файл сохранён (${(b.size/1048576).toFixed(1)} МБ)`);}catch(e){fail(e);}};
+    if(q('.sh'))q('.sh').onclick=async()=>{let b;try{b=await build();}catch(e){fail(e);return;}
+      try{await navigator.share({files:[new File([b],fname(),{type:b.type})],title:proj.name});}
+      catch(e){if(e.name==='NotAllowedError')toast('Файл готов — нажмите «Поделиться» ещё раз');else if(e.name!=='AbortError')toast('Не удалось поделиться');}};
+    q('.cl').onclick=()=>close(null);prep();});}
 
 /* ---------- резервное копирование ---------- */
 async function exportBackup(ids){
@@ -1726,7 +1765,7 @@ async function showStorage(){
   txt+='\n\nДанные хранятся только в этом браузере. Регулярно делайте резервную копию.';
   alertBox('Хранилище',txt);}
 $('#lsMenu').onclick=async()=>{
-  const k=await choose('Меню','',[{k:'bk',l:'Создать резервную копию'},{k:'rs',l:'Восстановить из резервной копии'},{k:'st',l:'Настройки'},{k:'tr',l:'Корзина'},{k:'inf',l:'Хранилище'},{k:'sy',l:'Синхронизировать'},{k:'up',l:'Проверить обновления'}],
+  const k=await choose('Меню','',[{k:'bk',l:'Создать резервную копию'},{k:'rs',l:'Восстановить из резервной копии'},{k:'st',l:'Настройки'},{k:'tr',l:(lastPs.some(p=>p.deleted)?`Корзина (${lastPs.filter(p=>p.deleted).length})`:'Корзина')},{k:'inf',l:'Хранилище'},{k:'sy',l:'Синхронизировать'},{k:'up',l:'Проверить обновления'}],
     `Версия ${APP_VERSION} от ${APP_DATE}<br>Последняя копия: ${bkInfo.lastExport?fmtDate(bkInfo.lastExport):'—'}<br>Последнее восстановление: ${bkInfo.lastImport?fmtDate(bkInfo.lastImport):'—'}<br>Синхронизация: ${syncCfg()?(syncState.lastSync?fmtDate(syncState.lastSync):'ещё не было'):'не настроена'}`);
   if(k==='bk')exportBackup();else if(k==='rs')$('#fBackup').click();else if(k==='st')openSettings();else if(k==='inf')showStorage();else if(k==='up')checkUpdate();else if(k==='tr'&&!trashView)navPush('trash');else if(k==='sy')syncNow();};
 $('#lsSync').onclick=()=>syncNow();
