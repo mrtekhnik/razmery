@@ -87,13 +87,27 @@ header.top h1{font-size:18px;margin:0 6px;flex:1;white-space:nowrap;overflow:hid
 .seg button.on{background:var(--accent);color:#fff}
 #toast{position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#222a33;color:#fff;padding:10px 16px;border-radius:20px;z-index:60;font-size:14px;max-width:90%;text-align:center;pointer-events:none}
 .tool span{white-space:nowrap;font-size:11px}
-#ctxBar{position:absolute;left:8px;bottom:8px;right:60px;display:flex;gap:6px;align-items:center;overflow-x:auto;scrollbar-width:none}
+#ctxBar{position:absolute;left:8px;bottom:8px;right:60px;display:flex;flex-wrap:wrap-reverse;gap:6px;align-items:center}
 #ctxBar::-webkit-scrollbar{display:none}
-#ctxBar .cnt,#ctxBar button{flex:none;height:40px;padding:0 14px;border-radius:20px;background:rgba(20,25,32,.82);color:#fff;font-size:14px;display:flex;align-items:center;white-space:nowrap}
+#ctxBar .cnt,#ctxBar button{flex:none;height:38px;padding:0 12px;border-radius:20px;background:rgba(20,25,32,.82);color:#fff;font-size:14px;display:flex;align-items:center;white-space:nowrap}
 #ctxBar button.on{background:var(--accent)}
 #ctxBar .sep{flex:none;width:1px;height:26px;background:rgba(255,255,255,.35)}
 #edNote{position:relative}
-#edNote.has::after{content:'';position:absolute;top:9px;right:9px;width:8px;height:8px;border-radius:50%;background:#ffd600}
+#hint{pointer-events:auto;cursor:pointer}
+#hint::after{content:'  ✕';opacity:.6}
+#hintQ{position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;background:rgba(20,25,32,.75);color:#fff;font-weight:700;font-size:17px}
+.tabs{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:4px 0 6px}
+.tabs button{flex:1;height:40px;font-weight:600;font-size:14px}
+.tabs button.on{background:var(--accent);color:#fff}
+.recent{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.recent .chip{background:#e7eef9;border-color:#c9d8f0}
+.srch{margin:0 12px 10px;position:relative}
+.srch input{width:100%;height:42px;border:1px solid var(--line);border-radius:10px;padding:0 36px 0 12px;font:inherit;font-size:15px;background:var(--card);outline:none}
+.srch input:focus{border-color:var(--accent)}
+.srch button{position:absolute;right:4px;top:4px;width:34px;height:34px;color:var(--muted);font-size:18px}
+.proj .path{font-size:12px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#lsSync{position:relative}
+#lsSync.has::after,#edNote.has::after{content:'';position:absolute;top:9px;right:9px;width:8px;height:8px;border-radius:50%;background:#ffd600}
 textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font-size:17px;line-height:1.35}
 .proj .cm{font-size:12px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #updBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(140px + env(safe-area-inset-bottom));z-index:55;background:#222a33;color:#fff;border-radius:24px;display:flex;align-items:center;gap:10px;padding:6px 6px 6px 16px;box-shadow:0 6px 20px rgba(0,0,0,.3);font-size:14px;white-space:nowrap}
@@ -108,7 +122,7 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
 .sect{font-weight:600;margin:18px 0 0;padding-top:12px;border-top:1px solid var(--line)}
 .crumbs{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:10px 12px 0;font-size:14px;color:var(--muted)}
 .crumbs button{color:var(--accent);padding:4px 2px;font-weight:600}
-.chipsRow{display:flex;gap:8px;padding:0 12px 10px;overflow-x:auto;scrollbar-width:none}
+.chipsRow{display:flex;flex-wrap:wrap;gap:8px;padding:0 12px 10px}
 .chipsRow::-webkit-scrollbar{display:none}
 .chipsRow button{flex:none;height:38px;padding:0 14px;border-radius:19px;background:var(--card);border:1px solid var(--line);font-size:14px;font-weight:600;white-space:nowrap}
 .chipsRow button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -145,6 +159,7 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
     <button class="big alt" id="btnCamera" data-ic="camera">Камера</button>
   </div>
   <div class="chipsRow" id="lsChips"></div>
+  <div class="srch" id="srch"><input type="search" id="srchIn" placeholder="Поиск по названию и комментарию" autocomplete="off"><button id="srchX" class="hidden" aria-label="Очистить">✕</button></div>
   <div id="bkLine" class="hidden"><span></span><button id="bkNow">Создать</button></div>
   <div id="projList"></div>
   <div id="emptyMsg" class="empty hidden"></div>
@@ -162,7 +177,8 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
   </header>
   <div id="stage">
     <canvas id="cv"></canvas>
-    <div id="hint"></div>
+    <div id="hint" title="Скрыть подсказки"></div>
+    <button id="hintQ" class="hidden" title="Показать подсказки">?</button>
     <div id="ctxBar" class="hidden"></div>
     <div id="zoomBox">
       <button id="zIn" data-ic="plus" aria-label="Увеличить"></button>
@@ -195,7 +211,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.12',APP_DATE='29.10.2026';
+const APP_VERSION='1.13',APP_DATE='29.10.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -229,7 +245,7 @@ function dbDelProject(id){const t=db.transaction(['projects','photos'],'readwrit
   t.objectStore('projects').delete(id);t.objectStore('photos').delete(id);return txDone(t);}
 
 /* ---------- настройки ---------- */
-let settings={color:'#e53935',lw:3,fs:36,halo:true,placeMode:'click3',angleRays:true,gridCols:2};
+let settings={color:'#e53935',lw:3,fs:36,halo:true,placeMode:'click3',angleRays:true,gridCols:2,ortho:true,snapPts:true,askName:true,hintOff:false,sort:'date',recent:[]};
 let bkInfo={lastExport:0,lastImport:0};
 async function loadBk(){try{const r=await dbGet('meta','backup');if(r&&r.value)bkInfo={...bkInfo,...r.value};}catch(e){}}
 function saveBk(){dbPut('meta',{key:'backup',value:bkInfo}).catch(()=>{});}
@@ -261,9 +277,11 @@ $('#ov').addEventListener('click',e=>{if(e.target.id==='ov'&&modalClose)modalClo
 function insertAtCursor(inp,s){const a=inp.selectionStart??inp.value.length,b=inp.selectionEnd??a;
   inp.value=inp.value.slice(0,a)+s+inp.value.slice(b);inp.selectionStart=inp.selectionEnd=a+s.length;inp.focus();}
 function askText(title,value,opts={}){return modal((box,close)=>{
-  box.innerHTML=`<h3></h3>${opts.multiline?'<textarea class="inp" rows="4"></textarea>':'<input type="text" class="inp" autocomplete="off" enterkeyhint="done">'}${opts.chips?'<div class="chips"></div>':''}
+  box.innerHTML=`<h3></h3>${opts.multiline?'<textarea class="inp" rows="4"></textarea>':'<input type="text" class="inp" autocomplete="off" enterkeyhint="done">'}${opts.recent&&opts.recent.length?'<div class="recent"></div>':''}${opts.chips?'<div class="chips"></div>':''}
   <div class="mbtns"><button class="btn" data-a="c">Отмена</button><button class="btn pri" data-a="ok">OK</button></div>`;
   box.querySelector('h3').textContent=title;const inp=box.querySelector('.inp');inp.value=value||'';inp.placeholder=opts.placeholder||'';
+  if(opts.recent&&opts.recent.length){const rr=box.querySelector('.recent');for(const t of opts.recent){const b=document.createElement('button');
+    b.className='chip';b.textContent=t;b.title='Недавнее значение';b.addEventListener('pointerdown',e=>e.preventDefault());b.onclick=()=>close(t);rr.appendChild(b);}}
   if(opts.chips){const cr=box.querySelector('.chips');for(const [lab,ins] of opts.chips){const b=document.createElement('button');
     b.className='chip';b.textContent=lab;b.addEventListener('pointerdown',e=>e.preventDefault());b.onclick=()=>insertAtCursor(inp,ins);cr.appendChild(b);}}
   box.querySelector('[data-a=c]').onclick=()=>close(null);
@@ -271,7 +289,8 @@ function askText(title,value,opts={}){return modal((box,close)=>{
   inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&(!opts.multiline||e.ctrlKey||e.metaKey)){e.preventDefault();close(inp.value.trim());}});
   setTimeout(()=>{inp.focus();if(opts.caretEnd){const n=inp.value.length;inp.setSelectionRange(n,n);}else inp.select();},50);});}
 const askLabel=v=>askText('Надпись',v,{multiline:true,placeholder:'Текст надписи (Enter — новая строка)',chips:[['Ø','Ø'],['R','R'],['мм',' мм'],['±','±'],['°','°'],['×','×']]});
-const askDimText=(v,ce)=>askText('Текст размера',v,{caretEnd:ce,placeholder:'например 25 мм',chips:[['Ø','Ø'],['R','R'],['мм',' мм'],['±','±'],['°','°'],['×','×']]});
+function rememberText(t){t=(t||'').trim();if(!t||t==='Ø'||t==='R')return;settings.recent=[t,...(settings.recent||[]).filter(x=>x!==t)].slice(0,8);saveSettings();}
+const askDimText=(v,ce)=>askText('Текст размера',v,{recent:settings.recent||[],caretEnd:ce,placeholder:'например 25 мм',chips:[['Ø','Ø'],['R','R'],['мм',' мм'],['±','±'],['°','°'],['×','×']]});
 function confirmBox(title,text,ok,danger){return modal((box,close)=>{
   box.innerHTML=`<h3></h3><p class="txt"></p><div class="mbtns"><button class="btn" data-a="c">Отмена</button><button class="btn ${danger?'dng':'pri'}" data-a="ok"></button></div>`;
   box.querySelector('h3').textContent=title;box.querySelector('.txt').textContent=text;box.querySelector('[data-a=ok]').textContent=ok||'OK';
@@ -493,7 +512,7 @@ function renderBkLine(live){const el=$('#bkLine'),t=bkInfo.lastExport;
   el.querySelector('span').textContent=t?`Изменено проектов с последней копии: ${changed}. Копия была ${daysAgo(t)}`:'Резервная копия ещё не создавалась';}
 $('#bkNow').onclick=()=>exportBackup();
 let thumbUrls=[];
-let folders=[],curFolder=null,trashView=false,navStack=[],selMode=false,selProj=new Set(),lastPs=[];
+let searchQ='',folders=[],curFolder=null,trashView=false,navStack=[],selMode=false,selProj=new Set(),lastPs=[];
 const TRASH_DAYS=30;
 async function loadFolders(){try{const r=await dbGet('meta','folders');folders=(r&&Array.isArray(r.value))?r.value:[];}catch(e){folders=[];}}
 const saveFolders=()=>dbPut('meta',{key:'folders',value:folders});
@@ -505,6 +524,8 @@ function applyNav(){const fs=navStack.filter(x=>x!=='trash');trashView=navStack[
   curFolder=fs.length?fs[fs.length-1]:null;if(curFolder&&!fById(curFolder))curFolder=null;selMode=false;selProj.clear();renderList();}
 function navPush(x){navStack.push(x);history.pushState({nav:navStack.length},'');applyNav();}
 $('#lsBack').onclick=()=>history.back();
+{let tm;$('#srchIn').addEventListener('input',e=>{clearTimeout(tm);tm=setTimeout(()=>{searchQ=e.target.value.trim();renderList();},200);});
+  $('#srchX').onclick=()=>{$('#srchIn').value='';searchQ='';renderList();};}
 function mkIconBtn(icon,title,fn){const b=document.createElement('button');b.innerHTML=ic(icon);b.title=title;b.onclick=e=>{e.stopPropagation();fn();};return b;}
 function updateSelUI(){$('#lsTitle').textContent=`Выбрано: ${selProj.size}`;$('#massBar').querySelectorAll('button').forEach(b=>b.disabled=!selProj.size);}
 async function renderList(){
@@ -528,13 +549,21 @@ async function renderList(){
     chip('Выбрать все',()=>{here.forEach(p=>selProj.add(p.id));renderList();});chip('Снять выбор',()=>{selProj.clear();renderList();});
     chip('Готово',()=>{selMode=false;selProj.clear();renderList();},'on');}
   else{chip('＋ Папка',newFolder).disabled=fDepth(curFolder)>=3;chip('Выбрать',()=>{selMode=true;selProj.clear();renderList();});
+    chip(settings.sort==='name'?'А–Я':'↓ Дата',()=>{settings.sort=settings.sort==='name'?'date':'name';saveSettings();renderList();}).title='Сортировка';
     chip('▦ '+(settings.gridCols||2),()=>{settings.gridCols=(settings.gridCols||2)%4+1;if(settings.gridCols<2)settings.gridCols=2;saveSettings();renderList();}).title='Карточек в строке';
     if(!curFolder)chip(inTrash.length?`Корзина (${inTrash.length})`:'Корзина',()=>navPush('trash'));}
-  renderBkLine(live);if(trashView||selMode)$('#bkLine').classList.add('hidden');
+  renderBkLine(live);if(trashView||selMode||searchQ)$('#bkLine').classList.add('hidden');
+  $('#srch').classList.toggle('hidden',trashView||selMode);$('#srchX').classList.toggle('hidden',!searchQ);
+  {const t=syncState.lastSync,cfg=syncCfg();const dirty=!!cfg&&(!t||all.some(p=>p.modified>t)||Object.keys(purged).length>0||folders.some(f=>(f.mod||0)>t)||Object.values(folderTomb).some(v=>v>t));
+    const b=$('#lsSync');b.classList.toggle('has',dirty);b.title=dirty?'Есть несинхронизированные изменения':'Синхронизировать';}
   const cols=settings.gridCols||2;list.className='g'+cols;list.innerHTML='';let items;
   if(trashView)items=inTrash.sort((a,b)=>b.deleted-a.deleted);
-  else{items=live.filter(p=>(p.folderId||null)===curFolder).sort((a,b)=>b.modified-a.modified);
+  else if(searchQ&&!selMode){const q=searchQ.toLowerCase();
+    items=live.filter(p=>(p.name||'').toLowerCase().includes(q)||(p.comment||'').toLowerCase().includes(q)||(p.dims||[]).some(o=>(o.text||'').toLowerCase().includes(q)));
+    folders.filter(f=>f.name.toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name,'ru')).forEach(f=>list.appendChild(folderCard(f,live)));}
+  else{items=live.filter(p=>(p.folderId||null)===curFolder);
     folders.filter(f=>(f.parent||null)===curFolder).sort((a,b)=>a.name.localeCompare(b.name,'ru')).forEach(f=>list.appendChild(folderCard(f,live)));}
+  if(!trashView)items.sort(settings.sort==='name'?(a,b)=>a.name.localeCompare(b.name,'ru',{numeric:true}):(a,b)=>b.modified-a.modified);
   for(const p of items)list.appendChild(projCard(p));
   const em=$('#emptyMsg');em.classList.toggle('hidden',list.children.length>0);
   em.innerHTML=trashView?`Корзина пуста.<br>Удалённые проекты хранятся здесь ${TRASH_DAYS} дней.`:curFolder?'Папка пуста.<br>Загрузите фото или переместите сюда проекты.':'Проектов пока нет.<br>Загрузите фото из галереи или сделайте снимок.';
@@ -561,7 +590,8 @@ function projCard(p){const el=document.createElement('div');el.className='proj'+
   if(trashView){const left=Math.max(0,TRASH_DAYS-Math.floor((Date.now()-p.deleted)/864e5));
     line('Удалён: '+fmtDate(p.deleted));line(`Удалится через ${left} ${plural(left,'день','дня','дней')}`);
     const f=fById(p.folderId);if(p.folderId)line(f?'Папка: '+f.name:'Папка удалена — восстановится в «Все проекты»');}
-  else{line('Создан: '+fmtDate(p.created));line('Изменён: '+fmtDate(p.modified));
+  else{if(searchQ&&p.folderId){const ch=fChain(p.folderId);if(ch.length)line('📁 '+ch.map(f=>f.name).join(' › '),'path');}
+    line('Создан: '+fmtDate(p.created));line('Изменён: '+fmtDate(p.modified));
     const nd=(p.dims||[]).filter(o=>!o.type||['dim','diam','rad','angle'].includes(o.type)).length,no=(p.dims||[]).length-nd;
     line('Размеров: '+nd+(no?`, пометок: ${no}`:''));
     if((p.comment||'').trim())line('💬 '+p.comment.trim().split('\n')[0],'cm');}
@@ -650,7 +680,9 @@ async function newProject(file){
     const w=im.naturalWidth,h=im.naturalHeight;if(!w||!h)throw new Error('size');
     const now=Date.now(),id=uid();const p={id,name:'Фото '+fmtDate(now),created:now,modified:now,w,h,dims:[],folderId:curFolder};
     p.thumb=await makeThumb(im,p,[]);const preview=await makePreview(im,w,h);URL.revokeObjectURL(im.src);
-    await dbPutMany([['projects',p],['photos',{id,blob,preview}]]);busy(false);openEditor(id);
+    await dbPutMany([['projects',p],['photos',{id,blob,preview}]]);busy(false);
+    if(settings.askName!==false){const v=await askText('Название проекта',p.name,{placeholder:'Например: Кронштейн, заказ 125'});if(v&&v!==p.name){p.name=v;await dbPut('projects',p);}}
+    openEditor(id);
   }catch(e){busy(false);alertBox('Не удалось открыть изображение','Формат не поддерживается браузером или файл повреждён. Попробуйте JPG или PNG.');}}
 
 /* ---------- редактор: состояние ---------- */
@@ -708,13 +740,15 @@ function setMode(m){mode=m;tmpP1=null;tmpP2=null;tmpTip=null;mpts=[];pendingDim=
 $('#tSelect').onclick=()=>setMode('select');
 $('#tDim').onclick=()=>setMode('create');
 $('#tLabel').onclick=()=>setMode('text');
+$('#hint').onclick=()=>{settings.hintOff=true;saveSettings();updateUI();toast('Подсказки скрыты. Показать — кнопка «?»');};
+$('#hintQ').onclick=()=>{settings.hintOff=false;saveSettings();updateUI();};
 $('#tDraw').onclick=()=>setMode('draw');
 $('#edNote').onclick=()=>editComment();
 $('#ctxBar').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
   if(b.dataset.k){dimKind=b.dataset.k;mpts=[];tmpP1=null;tmpP2=null;pendingDim=null;pendingObj=null;}
   else if(b.dataset.t)tool=b.dataset.t;
   else if(b.dataset.l){labelMode=b.dataset.l;tmpTip=null;pendingObj=null;}
-  else{const k=b.dataset.b;if(k==='e'){editText();return;}if(k==='s'){toggleShelf();return;}if(k==='g'){toggleRays();return;}if(k==='f'){flipSel();return;}if(k==='d'){delSel();return;}
+  else{const k=b.dataset.b;if(k==='e'){editText();return;}if(k==='st'){quickStyle();return;}if(k==='c'){dupSel();return;}if(k==='s'){toggleShelf();return;}if(k==='g'){toggleRays();return;}if(k==='f'){flipSel();return;}if(k==='d'){delSel();return;}
     if(k==='m')multi=!multi;else if(k==='a'){multi=true;dims.forEach(d=>selSet.add(d.id));}else if(k==='x'){selSet.clear();multi=false;}}
   updateUI();render();});
 $('#tStyle').onclick=()=>openSettings();
@@ -736,23 +770,23 @@ function updateUI(){if(!proj)return;
   else if(multi)h='Касайтесь объектов, чтобы добавить или убрать из выбора · перетаскивание — сдвиг выбранных';
   else if(one)h=(one.shelf&&isMeas(one)?'■ — полка · ':'')+(isDim(one)?'● — концы, ◆ — линия · ':one.type==='angle'?'● — вершина и стороны, ◆ — дуга · ':MEAS.includes(one.type)?'● — концы · ':(one.type==='text'&&one.tip?'● — острие выноски · ':(['arrow','oval','rect'].includes(one.type)?'● — углы · ':'')))+'перетащите, чтобы сдвинуть'+(isMeas(one)||one.type==='text'?' · двойное касание — текст':'');
   else h='Коснитесь объекта, чтобы выбрать · 1 палец — сдвиг фото, 2 — масштаб';
-  $('#hint').textContent=h;$('#edTitle').textContent=proj.name;
+  $('#hint').textContent=h;$('#hint').classList.toggle('hidden',!!settings.hintOff);$('#hintQ').classList.toggle('hidden',!settings.hintOff);$('#edTitle').textContent=proj.name;
   const parts=[];
   if(mode==='create')[['lin','Линейный'],['angle','Угол'],['diam','Диаметр'],['rad','Радиус']].forEach(([k,l])=>parts.push(`<button data-k="${k}" class="${dimKind===k?'on':''}">${l}</button>`));
   if(mode==='draw')[['pen','Карандаш'],['arrow','Стрелка'],['oval','Овал'],['rect','Рамка']].forEach(([k,l])=>parts.push(`<button data-t="${k}" class="${tool===k?'on':''}">${l}</button>`));
   if(mode==='text')[['plain','Текст'],['leader','С выноской']].forEach(([k,l])=>parts.push(`<button data-l="${k}" class="${labelMode===k?'on':''}">${l}</button>`));
-  if(n){if(parts.length)parts.push('<span class="sep"></span>');parts.push(`<span class="cnt">✓ ${n}</span>`);
+  if(n){if(parts.length)parts.push('<span class="sep"></span>');parts.push(`<button data-b="x" title="Снять выбор">✕ ${n}</button>`);
     if(one&&(isMeas(one)||one.type==='text'))parts.push('<button data-b="e">Изменить</button>');
     if(one&&isMeas(one)&&one.text)parts.push(`<button data-b="s" class="${one.shelf?'on':''}">${!one.shelf?'Полка':useLine(one)?'Полка: в линию':'Полка: выноска'}</button>`);
     if(one&&one.type==='angle')parts.push(`<button data-b="g" class="${one.rays===false?'':'on'}">Стороны</button>`);
     if(L.some(o=>isDim(o)||o.type==='angle'))parts.push('<button data-b="f">Перевернуть</button>');
-    parts.push('<button data-b="d">Удалить</button>');}
-  if(mode==='select'&&(n||multi))parts.push(`<button data-b="m" class="${multi?'on':''}">Несколько</button>`,'<button data-b="a">Все</button>','<button data-b="x" title="Снять выбор">✕</button>');
+    parts.push('<button data-b="st">Стиль</button>','<button data-b="c">Копия</button>','<button data-b="d">Удалить</button>');}
+  if(mode==='select'&&(n||multi)){parts.push(`<button data-b="m" class="${multi?'on':''}">Несколько</button>`);if(multi)parts.push('<button data-b="a">Все</button>');if(!n)parts.push('<button data-b="x">✕</button>');}
   const bar=$('#ctxBar');bar.innerHTML=parts.join('');bar.classList.toggle('hidden',!parts.length);}
 
 async function editText(){const o=selDim();if(!o)return;let v;
   if(isMeas(o))v=await askDimText(o.text,true);else if(o.type==='text')v=await askLabel(o.text);else return;
-  if(v===null||v===o.text||(o.type==='text'&&!v))return;pushHistory();o.text=v;changed();}
+  if(v===null||v===o.text||(o.type==='text'&&!v))return;if(isMeas(o))rememberText(v);pushHistory();o.text=v;changed();}
 async function editComment(){if(!proj)return;
   const r=await modal((box,close)=>{box.innerHTML=`<h3>Комментарий к фото</h3><textarea class="inp" rows="5" placeholder="Заметка к проекту: что за деталь, что проверить…"></textarea>
     <label class="chk"><input type="checkbox"> Печатать на экспортируемом изображении (полосой под фото)</label>
@@ -771,6 +805,30 @@ function toggleShelf(){const o=selDim();if(!o||!isMeas(o)||!o.text)return;pushHi
     o.shelf={x:a.x+nx*o.fs*2.5+o.fs*1.5,y:a.y+ny*o.fs*2.5-o.fs*0.5};}
   changed();}
 function toggleRays(){const o=selDim();if(!o||o.type!=='angle')return;pushHistory();o.rays=o.rays===false;changed();}
+function dupSel(){const L=selList();if(!L.length)return;pushHistory();const out=[];
+  for(const o of L){const c=clone(o);c.id=uid();const k=o.fs*1.5;translateObj(c,k,k);out.push(c);}
+  dims.push(...out);selSet=new Set(out.map(o=>o.id));changed();toast(out.length>1?`Скопировано: ${out.length}`:'Скопировано');}
+function quickStyle(){const L=selList();if(!L.length)return;const base=Math.max(proj.w,proj.h)/1000,f=L[0];
+  const before=JSON.stringify(dims);let touched=false;
+  const COLORS=['#e53935','#ffd600','#00c853','#2979ff','#ff6d00','#ffffff','#111111'];
+  modal((box,close)=>{
+    box.innerHTML=`<h3>Стиль выделенных (${L.length})</h3><div class="sws"></div>
+    <div class="lbl">Толщина линий: <b class="lwv"></b></div><input type="range" class="rng lw" min="1" max="12" step="0.5">
+    <div class="lbl">Размер шрифта: <b class="fsv"></b></div><input type="range" class="rng fs" min="12" max="100" step="1">
+    <label class="chk"><input type="checkbox" class="halo"> Контрастная обводка</label>
+    <div class="mbtns"><button class="btn pri ok">Готово</button></div>`;
+    const q=x=>box.querySelector(x);const lw0=Math.round(f.lw/base*2)/2,fs0=Math.round(f.fs/base);
+    const apply=(k,v)=>{touched=true;for(const o of L)o[k]=v;render();};
+    const sws=q('.sws');const drawSw=()=>{sws.innerHTML='';for(const c of COLORS){const b=document.createElement('button');b.className='sw'+(L.every(o=>o.color===c)?' on':'');b.style.background=c;
+      b.onclick=()=>{apply('color',c);drawSw();};sws.appendChild(b);}
+      const lab=document.createElement('label');lab.className='sw';lab.style.background='conic-gradient(red,yellow,lime,cyan,blue,magenta,red)';lab.innerHTML='<input type="color">';
+      const ci=lab.querySelector('input');ci.value=f.color;ci.oninput=()=>{apply('color',ci.value);lab.style.background=ci.value;};sws.appendChild(lab);};drawSw();
+    q('.lw').value=lw0;q('.lwv').textContent=lw0;q('.fs').value=fs0;q('.fsv').textContent=fs0;q('.halo').checked=f.halo!==false;
+    q('.lw').oninput=e=>{q('.lwv').textContent=e.target.value;apply('lw',+e.target.value*base);};
+    q('.fs').oninput=e=>{q('.fsv').textContent=e.target.value;apply('fs',+e.target.value*base);};
+    q('.halo').onchange=e=>apply('halo',e.target.checked);
+    q('.ok').onclick=()=>close(true);
+  }).then(()=>{if(touched&&proj){pushHistory(before);changed();}});}
 function flipSel(){const L=selList().filter(o=>isDim(o)||o.type==='angle');if(!L.length)return;pushHistory();
   L.forEach(o=>{if(isDim(o))o.off=-o.off;else if(o.type==='angle')o.rev=!o.rev;else o.ts=-(o.ts||1);});changed();}
 
@@ -802,7 +860,12 @@ function handleCircle(p){ctx.beginPath();ctx.arc(p.x,p.y,10,0,Math.PI*2);ctx.fil
 function handleSquare(p){const r=9;ctx.fillStyle='#1f6feb';ctx.fillRect(p.x-r,p.y-r,2*r,2*r);ctx.lineWidth=2.5;ctx.strokeStyle='#fff';ctx.strokeRect(p.x-r,p.y-r,2*r,2*r);}
 function handleDiamond(p){const r=11;ctx.beginPath();ctx.moveTo(p.x,p.y-r);ctx.lineTo(p.x+r,p.y);ctx.lineTo(p.x,p.y+r);ctx.lineTo(p.x-r,p.y);ctx.closePath();
   ctx.fillStyle='#1f6feb';ctx.fill();ctx.lineWidth=2.5;ctx.strokeStyle='#fff';ctx.stroke();}
-function drawOverlay(){
+function drawSnap(){if(!snapMark)return;const p=toScr(snapMark.x,snapMark.y);ctx.save();
+  if(snapMark.k==='pt'){ctx.strokeStyle='#00e676';ctx.lineWidth=2.5;ctx.strokeRect(p.x-9,p.y-9,18,18);}
+  else{const b=toScr(snapMark.bx,snapMark.by);ctx.setLineDash([5,5]);ctx.strokeStyle='#00e676';ctx.lineWidth=1.5;ctx.beginPath();
+    if(snapMark.k==='h'){ctx.moveTo(0,b.y);ctx.lineTo(cw,b.y);}else{ctx.moveTo(b.x,0);ctx.lineTo(b.x,ch);}ctx.stroke();}
+  ctx.restore();}
+function drawOverlay(){drawSnap();
   const L=selList(),one=L.length===1;
   ctx.save();ctx.setLineDash([6,5]);ctx.strokeStyle='#4da3ff';ctx.lineWidth=one?1.5:2.5;
   for(const o of L){ctx.beginPath();
@@ -847,20 +910,38 @@ function hitHandle(p){const o=selDim();if(!o)return null;let best=null,bd=30;
 /* ---------- жесты ---------- */
 const ptrs=new Map();let act=null,pinch=null,locked=false,lastTap={t:0,id:null};
 function pos(e){const r=cv.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
-function cancelAct(){if(!act)return;
+function cancelAct(){snapMark=null;if(!act)return;
   if(act.k==='handle')Object.assign(act.d,JSON.parse(act.snap));
   if(act.k==='move')act.targets.forEach((o,i)=>Object.assign(o,JSON.parse(act.snaps[i])));
   if(act.k==='place'&&!tmpP2)pendingDim=null;
   if(act.k==='draw'||act.k==='lplace'||act.k==='mplace')pendingObj=null;
   act=null;loupe=null;render();}
-function placeAt(p){const ip=clampImg(toImg(p));act.ip=ip;if(tmpP1)pendingDim=makeDim(tmpP1,ip);
+let snapMark=null;
+function snapPoints(skip){const out=[];
+  for(const o of dims){if(o===skip)continue;
+    if(o.type==='angle')out.push([o.cx,o.cy],[o.x1,o.y1],[o.x2,o.y2]);
+    else if(o.type==='text'){if(o.tip)out.push([o.tip.x,o.tip.y]);}
+    else if(o.type==='pen'){const q=o.pts;out.push(q[0],q[q.length-1]);}
+    else if(typeof o.x1==='number')out.push([o.x1,o.y1],[o.x2,o.y2]);}
+  return out;}
+function snap(ip,base,skip){snapMark=null;let r={x:ip.x,y:ip.y};
+  if(settings.snapPts!==false){const tol=16/view.s;let bd=tol,best=null;
+    for(const [x,y] of snapPoints(skip)){const d=Math.hypot(x-ip.x,y-ip.y);if(d<bd){bd=d;best=[x,y];}}
+    if(best){snapMark={x:best[0],y:best[1],k:'pt'};return {x:best[0],y:best[1]};}}
+  if(base&&settings.ortho!==false){const dx=ip.x-base.x,dy=ip.y-base.y,L=Math.hypot(dx,dy);
+    if(L*view.s>12){const a=Math.abs(Math.atan2(dy,dx))*180/Math.PI,T=4;
+      if(a<T||a>180-T){r={x:ip.x,y:base.y};snapMark={x:r.x,y:r.y,k:'h',bx:base.x,by:base.y};}
+      else if(Math.abs(a-90)<T){r={x:base.x,y:ip.y};snapMark={x:r.x,y:r.y,k:'v',bx:base.x,by:base.y};}}}
+  return clampImg(r);}
+function placeAt(p){const ip=snap(clampImg(toImg(p)),tmpP1);act.ip=ip;if(tmpP1)pendingDim=makeDim(tmpP1,ip);
   loupe=act.touchy?{ix:ip.x,iy:ip.y,sx:p.x,sy:p.y}:null;render();}
 function offsetAt(p){const d=pendingDim;if(!d)return;const ip=toImg(p),g=dimGeom(d);if(g)d.off=(ip.x-d.x1)*g.nx+(ip.y-d.y1)*g.ny;render();}
 function handleMove(p){const ip=toImg(p),x=ip.x+act.gx,y=ip.y+act.gy,o=act.d;
   if(act.h==='off'){const g=dimGeom(o);if(g)o.off=(x-o.x1)*g.nx+(y-o.y1)*g.ny;loupe=null;}
   else if(act.h==='r'){o.r=Math.max(o.fs*0.6,Math.hypot(x-o.cx,y-o.cy));loupe=null;}
   else if(act.h==='sh'){o.shelf={x,y};loupe=null;}
-  else{const c=clampImg({x,y});
+  else{const oth=(act.h==='p1'||act.h==='a')?{x:o.x2,y:o.y2}:(act.h==='p2'||act.h==='b')?{x:o.x1,y:o.y1}:null;
+    const c=snap(clampImg({x,y}),o.type==='angle'||o.type==='oval'||o.type==='rect'?null:oth,o);
     if(act.h==='v'){o.cx=c.x;o.cy=c.y;}else if(act.h==='p1'||act.h==='a'){o.x1=c.x;o.y1=c.y;}else if(act.h==='p2'||act.h==='b'){o.x2=c.x;o.y2=c.y;}else if(act.h==='tip')o.tip={x:c.x,y:c.y};
     loupe=act.touchy?{ix:c.x,iy:c.y,sx:p.x,sy:p.y}:null;}
   render();}
@@ -881,7 +962,7 @@ function buildMeas(kind,P){const b=newBase();
   if(P.length<2)return null;
   const o={...b,type:kind,x1:P[0].x,y1:P[0].y,x2:P[1].x,y2:P[1].y,text:kind==='diam'?'Ø':'R',ts:1};
   const L=Math.hypot(o.x2-o.x1,o.y2-o.y1)||1,ny=(o.x2-o.x1)/L;if(ny>1e-6)o.ts=-1;return o;}
-function mplaceAt(p){const ip=clampImg(toImg(p));act.ip=ip;loupe=act.touchy?{ix:ip.x,iy:ip.y,sx:p.x,sy:p.y}:null;
+function mplaceAt(p){const ip=snap(clampImg(toImg(p)),dimKind==='angle'?null:mpts[0]);act.ip=ip;loupe=act.touchy?{ix:ip.x,iy:ip.y,sx:p.x,sy:p.y}:null;
   pendingObj=buildMeas(dimKind,[...mpts,ip]);render();}
 async function finishMplace(a){const ip=a.ip;if(!ip)return;
   if(mpts.length){const last=mpts[mpts.length-1],s1=toScr(last.x,last.y),s2=toScr(ip.x,ip.y);
@@ -891,8 +972,8 @@ async function finishMplace(a){const ip=a.ip;if(!ip)return;
   const o=buildMeas(dimKind,mpts);mpts=[];pendingObj=o;updateUI();render();
   const v=await askDimText(o.text,true);pendingObj=null;
   if(v===null||!proj){render();updateUI();return;}
-  o.text=v;pushHistory();dims.push(o);selSet=new Set([o.id]);changed();}
-function lplaceAt(p){const ip=clampImg(toImg(p));act.ip=ip;loupe=act.touchy?{ix:ip.x,iy:ip.y,sx:p.x,sy:p.y}:null;
+  o.text=v;rememberText(v);pushHistory();dims.push(o);selSet=new Set([o.id]);changed();}
+function lplaceAt(p){const ip=(labelMode==='leader'&&!tmpTip)?snap(clampImg(toImg(p)),null):clampImg(toImg(p));act.ip=ip;loupe=act.touchy?{ix:ip.x,iy:ip.y,sx:p.x,sy:p.y}:null;
   if(tmpTip)pendingObj={...newBase(),type:'text',x:ip.x,y:ip.y,text:'Текст',tip:{...tmpTip}};render();}
 async function finishLplace(a){const ip=a.ip;if(!ip)return;
   if(labelMode==='leader'&&!tmpTip){tmpTip=ip;updateUI();render();return;}
@@ -944,7 +1025,7 @@ function onUp(e){
   if(ptrs.size===0)locked=false;
   if(!act)return;
   if(e.type==='pointercancel'){cancelAct();return;}
-  const a=act;act=null;loupe=null;
+  const a=act;act=null;loupe=null;snapMark=null;
   if(a.k==='place')finishPlace(a);
   else if(a.k==='offset')finishOffset();
   else if(a.k==='lplace')finishLplace(a);
@@ -970,7 +1051,7 @@ async function finishOffset(){if(!pendingDim)return;tmpP1=null;tmpP2=null;update
 async function commitPending(){const d=pendingDim;if(!d)return;
   const v=await askDimText('');pendingDim=null;
   if(v===null||!proj){render();updateUI();return;}
-  d.text=v;pushHistory();dims.push(d);selSet=new Set([d.id]);changed();}
+  d.text=v;rememberText(v);pushHistory();dims.push(d);selSet=new Set([d.id]);changed();}
 function doTap(p,mod){const d=hitObj(p),now=Date.now();
   if(multi||mod){if(d){selSet.has(d.id)?selSet.delete(d.id):selSet.add(d.id);}lastTap={t:0,id:null};}
   else if(d){const one=selDim();if(one&&one.id===d.id&&lastTap.id===d.id&&now-lastTap.t<400){lastTap={t:0,id:null};editText();return;}
@@ -983,22 +1064,34 @@ document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.code==='KeyZ'){e.preventDefault();e.shiftKey?redo():undo();}
   else if((e.ctrlKey||e.metaKey)&&e.code==='KeyY'){e.preventDefault();redo();}
   else if(e.key==='Delete')delSel();
+  else if(!e.ctrlKey&&!e.metaKey&&!e.altKey&&!act){const k=e.code;
+    if(k==='KeyV')setMode('select');else if(k==='KeyD')setMode('create');else if(k==='KeyT')setMode('text');else if(k==='KeyP')setMode('draw');
+    else if(k==='KeyF')flipSel();else if(k==='KeyC')dupSel();else if(k==='KeyS')quickStyle();else return;}
   else if((e.ctrlKey||e.metaKey)&&e.code==='KeyA'&&mode==='select'){e.preventDefault();dims.forEach(d=>selSet.add(d.id));updateUI();render();}
   else if(e.key==='Escape'){if(tmpP1||tmpP2||tmpTip||mpts.length){tmpP1=null;tmpP2=null;tmpTip=null;mpts=[];pendingDim=null;pendingObj=null;}else{selSet.clear();multi=false;}updateUI();render();}});
 
 /* ---------- оформление ---------- */
 function applyStyle(list){if(!list.length)return;pushHistory();const base=Math.max(proj.w,proj.h)/1000;
   for(const d of list){d.color=settings.color;d.lw=settings.lw*base;d.fs=settings.fs*base;d.halo=settings.halo;}changed();}
-function openSettings(){return modal((box,close)=>{
+function openSettings(tab){return modal((box,close)=>{
   const COLORS=['#e53935','#ffd600','#00c853','#2979ff','#ff6d00','#ffffff','#111111'];
   box.innerHTML=`<h3>Настройки</h3>
+  <div class="tabs"><button data-tab="p">Простановка</button><button data-tab="s">Оформление</button><button data-tab="y">Синхронизация</button></div>
+  <div data-pane="p">
   <div class="lbl">Положение размерной линии при простановке</div>
   <label class="radio"><input type="radio" name="pm" value="click3"><span>Третьим касанием<small>После второй точки линия следует за пальцем — коснитесь, где её поставить (как в CAD)</small></span></label>
   <label class="radio"><input type="radio" name="pm" value="auto"><span>Автоматически<small>Сверху или слева, а если там край фото — с другой стороны. Сразу открывается ввод текста</small></span></label>
   <div class="lbl">Угловой размер</div>
   <label class="radio"><input type="radio" name="ar" value="1"><span>Со сторонами угла</span></label>
   <label class="radio"><input type="radio" name="ar" value="0"><span>Только дуга с размером</span></label>
-  <div class="sect">Оформление</div><p class="note">Действует на новые размеры, надписи и рисунки. Уже нанесённые меняются только кнопками применения ниже.</p>
+  <div class="lbl">Привязки</div>
+  <label class="chk"><input type="checkbox" class="ortho"> Орто: почти горизонтальное или вертикальное выравнивается точно</label>
+  <label class="chk"><input type="checkbox" class="snp"> Привязка к точкам других размеров и стрелок</label>
+  <div class="lbl">Проекты</div>
+  <label class="chk"><input type="checkbox" class="askn"> Спрашивать название при создании проекта</label>
+  <label class="chk"><input type="checkbox" class="hnt"> Показывать подсказки в редакторе</label>
+  </div>
+  <div data-pane="s"><p class="note">Действует на новые размеры, надписи и рисунки. Уже нанесённые меняются только кнопками применения ниже.</p>
   <div class="lbl">Цвет линий и текста</div><div class="sws"></div>
   <div class="lbl">Толщина линий: <b class="lwv"></b></div><input type="range" class="rng lw" min="1" max="12" step="0.5">
   <div class="lbl">Размер шрифта: <b class="fsv"></b></div><input type="range" class="rng fs" min="12" max="100" step="1">
@@ -1006,13 +1099,21 @@ function openSettings(){return modal((box,close)=>{
   <canvas class="prev"></canvas>
   <p class="note">Толщина и шрифт задаются относительно размера фото, поэтому на снимках любого разрешения выглядят одинаково.</p>
   <div class="apply"></div>
-  <div class="sect">Синхронизация через GitHub</div>
+  </div>
+  <div data-pane="y">
   <p class="note">Телефон и компьютер обмениваются проектами через ваш <b>приватный</b> репозиторий, по кнопке ⟳ на главном экране. Подключение общее для всех ваших приложений на mrtekhnik.github.io.</p>
   <div class="lbl">Репозиторий (имя/репозиторий)</div><input class="inp sm repo" placeholder="mrtekhnik/sync" autocomplete="off" autocapitalize="off" spellcheck="false">
   <div class="lbl">Токен доступа</div><input class="inp sm tok" type="password" placeholder="github_pat_…" autocomplete="off" autocapitalize="off" spellcheck="false">
   <div class="row2"><button class="btn sy1">Сохранить и проверить</button><button class="btn ghost sy0">Отключить</button></div>
   <p class="note sst"></p>
+  </div>
   <div class="mbtns"><button class="btn pri ok">Готово</button></div>`;
+  const showTab=t=>{box.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));box.querySelectorAll('[data-pane]').forEach(d=>d.classList.toggle('hidden',d.dataset.pane!==t));
+    if(t==='s')requestAnimationFrame(()=>upd(true));};
+  box.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));showTab(tab||'p');
+  const ck=(cls,key,def)=>{const el=box.querySelector(cls);el.checked=settings[key]===undefined?def:!!settings[key];el.onchange=()=>{settings[key]=el.checked;saveSettings();};};
+  ck('.ortho','ortho',true);ck('.snp','snapPts',true);ck('.askn','askName',true);
+  {const el=box.querySelector('.hnt');el.checked=!settings.hintOff;el.onchange=()=>{settings.hintOff=!el.checked;saveSettings();if(proj)updateUI();};}
   const q=s=>box.querySelector(s),sws=q('.sws'),pc=q('.prev');
   function drawSw(){sws.innerHTML='';const cur=settings.color.toLowerCase();
     for(const c of COLORS){const b=document.createElement('button');b.className='sw'+(cur===c?' on':'');b.style.background=c;b.onclick=()=>{settings.color=c;upd(true);};sws.appendChild(b);}
@@ -1227,7 +1328,7 @@ async function loadSync(){
 function recordPurge(ids){const t=Date.now();let n=0;ids.forEach(id=>{if(syncState.known[id]!==undefined){purged[id]=t;n++;}});
   return n?dbPut('meta',{key:'purged',value:purged}).catch(()=>{}):Promise.resolve();}
 async function syncNow(){
-  const cfg=syncCfg();if(!cfg){toast('Сначала подключите GitHub: Настройки → Синхронизация');openSettings();return;}
+  const cfg=syncCfg();if(!cfg){toast('Сначала подключите GitHub: Настройки → Синхронизация');openSettings('y');return;}
   if(syncing)return;syncing=true;busy(true,'Синхронизация…');
   try{let res;for(let a=0;a<3;a++){try{res=await syncOnce(cfg);break;}catch(e){if((e.status===422||e.status===409)&&a<2)continue;throw e;}}
     busy(false);await renderList();
