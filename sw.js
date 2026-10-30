@@ -4,7 +4,7 @@
 // Удаляются только свои старые кэши (razmery-*): на домене mrtekhnik.github.io живут и другие приложения.
 // Библиотеки PDF (папка lib/) лежат в отдельном кэше LIB_CACHE: он не сбрасывается при обновлении приложения
 // и скачивается заново только при смене LIB_VERSION.
-const VERSION = '1.20';
+const VERSION = '1.21';
 const CACHE = 'razmery-' + VERSION;
 const LIB_VERSION = '1';
 const LIB_CACHE = 'razmery-lib-' + LIB_VERSION;

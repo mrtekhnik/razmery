@@ -175,20 +175,21 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
 .pgTools input{flex:1;height:40px;border:1px solid var(--line);border-radius:10px;padding:0 10px;font:inherit;font-size:15px;min-width:0}
 .pgTools button{height:40px;padding:0 12px;border-radius:10px;background:#eef2f7;font-size:14px;font-weight:600}
 .mbtns.stick{position:sticky;bottom:-18px;background:var(--card);margin:12px -18px -18px;padding:12px 18px;border-top:1px solid var(--line);border-radius:0 0 16px 16px;z-index:1}
-#ctxBar{position:absolute;left:6px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:2px;background:rgba(20,25,32,.88);border-radius:12px;padding:3px;z-index:3}
-#ctxBar button{width:54px;height:48px;border-radius:9px;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:10px;line-height:1.1}
-#ctxBar button svg.i{width:21px;height:21px}
-#ctxBar button.on{background:var(--accent)}
-#ctxBar .cnt{height:36px;font-size:14px;font-weight:700;border-bottom:1px solid rgba(255,255,255,.15);border-radius:9px 9px 0 0}
-#ctxBar .dng{color:#ff8a80}
 #subBar{display:flex;gap:4px;background:#161b21;padding:6px 6px 4px}
 #subBar button{flex:1;height:50px;border-radius:6px;background:rgba(255,255,255,.08);color:#e9eef5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
 #subBar button b{font-size:19px;line-height:1;font-weight:600}
 #subBar button span{font-size:11px;opacity:.85}
 #subBar button.on{background:var(--accent);color:#fff}
-#morePop{position:absolute;z-index:4;background:#fff;color:var(--ink);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.35);padding:4px;min-width:200px}
-#morePop button{display:block;width:100%;text-align:left;padding:11px 14px;border-radius:8px;font-size:15px}
-#morePop button:active{background:#eef2f7}
+#ctxBar{display:flex;gap:4px;background:#161b21;padding:6px 6px 0}
+#ctxBar button{flex:1;min-width:0;height:48px;border-radius:6px;background:rgba(255,255,255,.08);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:10.5px;line-height:1.1}
+#ctxBar button svg.i{width:21px;height:21px}
+#ctxBar button.on{background:var(--accent)}
+#ctxBar .cnt{flex:0 0 50px;font-size:14px;font-weight:700}
+#ctxBar .dng{color:#ff8a80}
+#morePop{position:absolute;right:6px;bottom:6px;z-index:4;display:flex;gap:4px;background:rgba(20,25,32,.95);border-radius:10px;padding:4px;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+#morePop button{width:60px;height:54px;border-radius:8px;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10.5px;line-height:1.1}
+#morePop button svg.i{width:22px;height:22px}
+#morePop button.on{background:var(--accent)}
 #busy{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center}
 #busy span{background:#fff;padding:14px 22px;border-radius:12px}
 </style>
@@ -226,7 +227,6 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
     <canvas id="cv"></canvas>
     <div id="hint" title="Скрыть подсказки"></div>
     <button id="hintQ" class="hidden" title="Показать подсказки">?</button>
-    <div id="ctxBar" class="hidden"></div>
     <div id="morePop" class="hidden"></div>
     <div id="sheetNav" class="hidden"><button class="sp">◀</button><span class="sn"></span><button class="sx">▶</button></div>
     <div id="zoomBox">
@@ -235,6 +235,7 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
       <button id="zFit" data-ic="fit" aria-label="Вписать"></button>
     </div>
   </div>
+  <div id="ctxBar" class="hidden"></div>
   <div id="subBar" class="hidden"></div>
   <nav id="tools">
     <button class="tool" id="tSelect" data-ic="pointer"><span>Выбор</span></button>
@@ -263,7 +264,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.20',APP_DATE='29.10.2026';
+const APP_VERSION='1.21',APP_DATE='29.10.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -272,7 +273,7 @@ text:'M5 7V4h14v3M12 4v16M9 20h6',trash:'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-1
 style:'M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3c2.6 0 4.7-2.1 4.7-4.7C22 5.9 17.5 3 12 3zM7.5 11h.01M10.5 7h.01M15.5 7.5h.01',
 plus:'M12 5v14M5 12h14',minus:'M5 12h14',fit:'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
 camera:'M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',image:'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4',
-select:'M4 4h6M14 4h6M4 20h6M14 20h6M4 4v6M4 14v6M20 4v6M20 14v6',dots:'M12 5h.01M12 12h.01M12 19h.01',more:'M5 12h.01M12 12h.01M19 12h.01',copy:'M9 9h11v11H9zM5 15H4V4h11v1',shelf:'M4 19l7-8h9M12 7h7',close:'M6 6l12 12M18 6L6 18',pdf:'M6 2h9l5 5v15H6zM14 2v6h6M9 13h2a1.5 1.5 0 0 1 0 3H9v-5M9 16v2',crop:'M6 2v14a2 2 0 0 0 2 2h14M18 22V8a2 2 0 0 0-2-2H2',stitch:'M3 5h8v14H3zM13 5h8v14h-8z',sync:'M20 12a8 8 0 0 1-14 5.3M4 12a8 8 0 0 1 14-5.3M18 3v4h-4M6 21v-4h4',folder:'M3 6h6l2 2h10v11H3z',restore:'M4 12a8 8 0 1 0 2.5-5.8M4 4v4h4',flip:'M7 20V4M3 8l4-4 4 4M17 4v16M13 16l4 4 4-4',note:'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5',pen:'M4 20l4-1 11-11-3-3L5 16zM14 6l3 3',edit:'M4 20h4L19 9l-4-4L4 16zM14 6l4 4'};
+select:'M4 4h6M14 4h6M4 20h6M14 20h6M4 4v6M4 14v6M20 4v6M20 14v6',rays:'M4 19L19 7M4 19h16M13 19a9 9 0 0 0-2-6',all:'M3 3h18v18H3zM8 12l3 3 5-6',dots:'M12 5h.01M12 12h.01M12 19h.01',more:'M5 12h.01M12 12h.01M19 12h.01',copy:'M9 9h11v11H9zM5 15H4V4h11v1',shelf:'M4 19l7-8h9M12 7h7',close:'M6 6l12 12M18 6L6 18',pdf:'M6 2h9l5 5v15H6zM14 2v6h6M9 13h2a1.5 1.5 0 0 1 0 3H9v-5M9 16v2',crop:'M6 2v14a2 2 0 0 0 2 2h14M18 22V8a2 2 0 0 0-2-2H2',stitch:'M3 5h8v14H3zM13 5h8v14h-8z',sync:'M20 12a8 8 0 0 1-14 5.3M4 12a8 8 0 0 1 14-5.3M18 3v4h-4M6 21v-4h4',folder:'M3 6h6l2 2h10v11H3z',restore:'M4 12a8 8 0 1 0 2.5-5.8M4 4v4h4',flip:'M7 20V4M3 8l4-4 4 4M17 4v16M13 16l4 4 4-4',note:'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5',pen:'M4 20l4-1 11-11-3-3L5 16zM14 6l3 3',edit:'M4 20h4L19 9l-4-4L4 16zM14 6l4 4'};
 const ic=n=>`<svg class="i" viewBox="0 0 24 24"${n==='dots'?' style="stroke-width:3.5"':''}><path d="${ICONS[n]}"/></svg>`;
 document.querySelectorAll('[data-ic]').forEach(el=>el.insertAdjacentHTML('afterbegin',ic(el.dataset.ic)));
 
@@ -1186,12 +1187,10 @@ function updateUI(){if(!proj)return;
   const bar=$('#ctxBar');bar.innerHTML=a.join('');bar.classList.toggle('hidden',!a.length);if(!a.length)closeMore();}
 function closeMore(){const m=$('#morePop');if(m)m.classList.add('hidden');}
 function moreMenu(btn){const pop=$('#morePop');if(!pop.classList.contains('hidden')){closeMore();return;}
-  const L=selList(),one=L.length===1?L[0]:null;const o=[['st','Стиль: цвет, толщина, шрифт'],['c','Копия']];
-  if(one&&one.type==='angle')o.push(['g',one.rays===false?'Показать стороны угла':'Скрыть стороны угла']);
-  o.push(['m',multi?'Выключить выбор нескольких':'Выбрать несколько'],['a','Выбрать все']);
-  pop.innerHTML=o.map(([k,l])=>`<button data-k="${k}">${l}</button>`).join('');pop.classList.remove('hidden');
-  const st=$('#stage').getBoundingClientRect(),br=btn.getBoundingClientRect();
-  pop.style.left=(br.right-st.left+6)+'px';pop.style.top=Math.max(6,Math.min(st.height-pop.offsetHeight-6,br.top-st.top+br.height/2-pop.offsetHeight/2))+'px';
+  const L=selList(),one=L.length===1?L[0]:null,o=[['st','style','Стиль'],['c','copy','Копия']];
+  if(one&&one.type==='angle')o.push(['g','rays',one.rays===false?'Стороны':'Без сторон']);
+  o.push(['m','select','Несколько',multi],['a','all','Все']);
+  pop.innerHTML=o.map(([k,i,l,on])=>`<button data-k="${k}" class="${on?'on':''}">${ic(i)}<span>${l}</span></button>`).join('');pop.classList.remove('hidden');
   pop.onclick=e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.k;closeMore();
     if(k==='st')quickStyle();else if(k==='c')dupSel();else if(k==='g')toggleRays();
     else if(k==='m'){multi=!multi;updateUI();render();}else if(k==='a'){multi=true;dims.forEach(d=>selSet.add(d.id));updateUI();render();}};}
