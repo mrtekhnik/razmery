@@ -234,7 +234,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.15',APP_DATE='29.10.2026';
+const APP_VERSION='1.16',APP_DATE='29.10.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -268,7 +268,7 @@ function dbDelProject(id){const t=db.transaction(['projects','photos'],'readwrit
   t.objectStore('projects').delete(id);t.objectStore('photos').delete(id);return txDone(t);}
 
 /* ---------- настройки ---------- */
-let settings={expSize:0,stitch:{dir:'row',gap:1,bg:'#ffffff',cols:0},adjustOnLoad:true,color:'#e53935',lw:3,fs:36,halo:true,placeMode:'click3',angleRays:true,gridCols:2,ortho:true,snapPts:true,askName:true,hintOff:false,sort:'date',recent:[]};
+let settings={pdf:{paper:'a4',dpi:150},expSize:0,stitch:{dir:'row',gap:1,bg:'#ffffff',cols:0},adjustOnLoad:true,color:'#e53935',lw:3,fs:36,halo:true,placeMode:'click3',angleRays:true,gridCols:2,ortho:true,snapPts:true,askName:true,hintOff:false,sort:'date',recent:[]};
 let bkInfo={lastExport:0,lastImport:0};
 async function loadBk(){try{const r=await dbGet('meta','backup');if(r&&r.value)bkInfo={...bkInfo,...r.value};}catch(e){}}
 function saveBk(){dbPut('meta',{key:'backup',value:bkInfo}).catch(()=>{});}
@@ -854,13 +854,19 @@ $('#fStitch').onchange=async e=>{const fs=[...e.target.files];e.target.value='';
   busy(false);try{await stitchDialog(items,false);}finally{freeItems(items);}};
 async function massExport(){const L=selRecs();if(!L.length)return;
   const fmt=await modal((box,close)=>{let f='jpg';
-    box.innerHTML=`<h3>Экспорт изображений</h3><p class="txt">Проектов: ${L.length}</p><div class="seg"><button data-f="jpg" class="on">JPG</button><button data-f="png">PNG</button></div>${SIZE_SEG}
-    <p class="note">Комментарий добавляется к тем проектам, где включено «печатать на экспортируемом изображении». Исходные фото не меняются.</p>
+    box.innerHTML=`<h3>Экспорт</h3><p class="txt">Проектов: ${L.length}</p><div class="seg"><button data-f="jpg" class="on">JPG</button><button data-f="png">PNG</button><button data-f="pdf">PDF-отчёт</button></div><div class="szw">${SIZE_SEG}</div>${PDF_SEG}
+    <p class="note">PDF-отчёт — один файл, по странице на проект. Комментарий добавляется к тем проектам, где включено «печатать на экспортируемом изображении». Исходные фото не меняются.</p>
     <div class="mbtns"><button class="btn" data-a="c">Отмена</button><button class="btn pri" data-a="ok">Подготовить</button></div>`;
-    box.querySelectorAll('.seg button[data-f]').forEach(b=>b.onclick=()=>{f=b.dataset.f;box.querySelectorAll('.seg button[data-f]').forEach(x=>x.classList.toggle('on',x===b));});bindSizeSeg(box);
+    const vis=()=>{box.querySelector('.szw').classList.toggle('hidden',f==='pdf');box.querySelector('.pdfo').classList.toggle('hidden',f!=='pdf');};vis();
+    box.querySelectorAll('.seg button[data-f]').forEach(b=>b.onclick=()=>{f=b.dataset.f;box.querySelectorAll('.seg button[data-f]').forEach(x=>x.classList.toggle('on',x===b));vis();});bindSizeSeg(box);bindPdfSeg(box);
     box.querySelector('[data-a=c]').onclick=()=>close(null);box.querySelector('[data-a=ok]').onclick=()=>close(f);});
   if(!fmt)return;const files=[],used=new Set();
-  try{for(let i=0;i<L.length;i++){busy(true,`Подготовка ${i+1} из ${L.length}…`);const p=L[i],ph=await dbGet('photos',p.id);if(!ph)continue;
+  if(fmt==='pdf'){const pages=[];
+    try{for(let i=0;i<L.length;i++){busy(true,`Страница ${i+1} из ${L.length}…`);const p=L[i],ph=await dbGet('photos',p.id);if(!ph)continue;
+        const im=await baseImage(p,ph);try{pages.push(await pageJpeg(pdfPage(p,im,p.dims||[],{...settings.pdf,note:!!(p.comment||'').trim()})));}finally{URL.revokeObjectURL(im.src);}}
+      const d=new Date(),pad=n=>String(n).padStart(2,'0');files.push(new File([buildPdf(pages)],`Отчёт_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.pdf`,{type:'application/pdf'}));}
+    catch(e){busy(false);alertBox('Ошибка','Не удалось создать PDF (не хватает памяти?). Попробуйте качество «Обычное» или меньше проектов.');return;}}
+  else try{for(let i=0;i<L.length;i++){busy(true,`Подготовка ${i+1} из ${L.length}…`);const p=L[i],ph=await dbGet('photos',p.id);if(!ph)continue;
       const im=await baseImage(p,ph);
       try{const r=await renderExport(fmt,!!p.commentOnExport,p,im,p.dims||[],settings.expSize||0);let base=safeName(p.name)+'_размеры',nm=base,k=2;
         while(used.has(nm))nm=`${base} (${k++})`;used.add(nm);files.push(new File([r.blob],nm+'.'+fmt,{type:r.blob.type}));}
@@ -868,7 +874,7 @@ async function massExport(){const L=selRecs();if(!L.length)return;
   catch(e){busy(false);alertBox('Ошибка','Не удалось подготовить изображения (не хватает памяти?).');return;}
   busy(false);let canSh=false;try{canSh=!!(navigator.share&&navigator.canShare&&navigator.canShare({files}));}catch(e){}
   await modal((box,close)=>{const mb=files.reduce((a,f)=>a+f.size,0)/1048576;
-    box.innerHTML=`<h3>Изображения готовы</h3><p class="txt">Файлов: ${files.length}\nРазмер: ${mb.toFixed(1)} МБ</p>
+    box.innerHTML=`<h3>${fmt==='pdf'?'PDF готов':'Изображения готовы'}</h3><p class="txt">Файлов: ${files.length}\nРазмер: ${mb.toFixed(1)} МБ</p>
     ${canSh?'<button class="btn pri block sh">Поделиться…</button>':''}<button class="btn ${canSh?'':'pri '}block sv">Сохранить на устройство</button><button class="btn block ghost cl">Закрыть</button>`;
     const q=s=>box.querySelector(s);
     if(q('.sh'))q('.sh').onclick=async()=>{try{await navigator.share({files});toast('Отправлено');}catch(e){if(e.name!=='AbortError')toast('Не удалось поделиться — сохраните файлы');}};
@@ -1386,6 +1392,41 @@ function openSettings(tab){return modal((box,close)=>{
 function wrapText(c,text,maxW){const out=[];
   for(const para of text.split('\n')){let line='';for(const w of para.split(/\s+/)){const t=line?line+' '+w:w;if(c.measureText(t).width<=maxW||!line)line=t;else{out.push(line);line=w;}}out.push(line);}
   return out;}
+/* ---------- PDF ---------- */
+const PDF_SEG='<div class="pdfo"><div class="lbl">Формат листа</div><div class="seg pp"><button data-p="a4">A4</button><button data-p="a3">A3</button></div><div class="lbl">Качество</div><div class="seg pq"><button data-q="150">Обычное</button><button data-q="250">Высокое</button></div><p class="note">Ориентация листа — по фото. На странице: название, дата, фото с разметкой и комментарий.</p></div>';
+function bindPdfSeg(box,cb){const pp=box.querySelectorAll('.seg.pp button'),pq=box.querySelectorAll('.seg.pq button');
+  const mark=()=>{pp.forEach(b=>b.classList.toggle('on',b.dataset.p===settings.pdf.paper));pq.forEach(b=>b.classList.toggle('on',+b.dataset.q===settings.pdf.dpi));};mark();
+  pp.forEach(b=>b.onclick=()=>{settings.pdf={...settings.pdf,paper:b.dataset.p};saveSettings();mark();if(cb)cb();});
+  pq.forEach(b=>b.onclick=()=>{settings.pdf={...settings.pdf,dpi:+b.dataset.q};saveSettings();mark();if(cb)cb();});}
+function pdfPage(P,IM,OBJ,o){const mm=o.dpi/25.4;let pw=o.paper==='a3'?297:210,ph=o.paper==='a3'?420:297;if(P.w>P.h)[pw,ph]=[ph,pw];
+  const W=Math.round(pw*mm),H=Math.round(ph*mm),c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+  x.fillStyle='#fff';x.fillRect(0,0,W,H);const m=12*mm,F=(sz,b)=>`${b?'700 ':''}${Math.round(sz*mm)}px system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif`;
+  x.fillStyle='#1b2430';x.textBaseline='top';x.font=F(6,true);let name=P.name||'';
+  while(name.length>1&&x.measureText(name).width>W-2*m)name=name.slice(0,-2)+'…';x.fillText(name,m,m);
+  x.font=F(3.6);x.fillStyle='#6b7686';x.fillText('Дата: '+fmtDate(P.modified||Date.now()),m,m+8*mm);
+  let y=m+14*mm;x.fillStyle='#d9dee5';x.fillRect(m,y,W-2*m,Math.max(1,0.3*mm));y+=4*mm;
+  const note=o.note?(P.comment||'').trim():'';let lines=[],lh=5.2*mm;
+  if(note){x.font=F(3.8);lines=wrapText(x,note,W-2*m);const maxL=Math.floor((H-y-m-60*mm)/lh);if(lines.length>maxL&&maxL>0){lines=lines.slice(0,maxL);lines[maxL-1]+=' …';}}
+  const noteH=lines.length?lines.length*lh+5*mm:0,aw=W-2*m,ah=H-y-m-noteH,k=Math.min(aw/P.w,ah/P.h),iw=P.w*k,ih=P.h*k,ix=(W-iw)/2;
+  x.save();x.translate(ix,y);x.scale(k,k);x.imageSmoothingQuality='high';x.drawImage(IM,0,0,P.w,P.h);for(const d of OBJ)drawObj(x,d);x.restore();
+  x.strokeStyle='#c9ced6';x.lineWidth=Math.max(1,0.25*mm);x.strokeRect(ix,y,iw,ih);
+  if(lines.length){x.font=F(3.8);x.fillStyle='#1b2430';let ty=y+ih+5*mm;for(const ln of lines){x.fillText(ln,m,ty);ty+=lh;}}
+  return {c,wpt:pw*72/25.4,hpt:ph*72/25.4};}
+async function pageJpeg(pg){const b=await toBlob(pg.c,'image/jpeg',0.9);const r={bytes:new Uint8Array(await b.arrayBuffer()),w:pg.c.width,h:pg.c.height,wpt:pg.wpt,hpt:pg.hpt};pg.c.width=pg.c.height=0;return r;}
+function buildPdf(pages){const enc=new TextEncoder(),parts=[],offs=[];let len=0;
+  const put=v=>{const b=typeof v==='string'?enc.encode(v):v;parts.push(b);len+=b.length;};
+  const obj=(n,body)=>{offs[n]=len;put(`${n} 0 obj\n`);body();put('\nendobj\n');};
+  put('%PDF-1.4\n');put(new Uint8Array([0x25,0xE2,0xE3,0xCF,0xD3,0x0A]));
+  const N=pages.length,kids=pages.map((_,i)=>`${3+3*i} 0 R`).join(' ');
+  obj(1,()=>put('<< /Type /Catalog /Pages 2 0 R >>'));
+  obj(2,()=>put(`<< /Type /Pages /Kids [${kids}] /Count ${N} >>`));
+  pages.forEach((p,i)=>{const pn=3+3*i,cn=pn+1,im=pn+2,W=p.wpt.toFixed(2),H=p.hpt.toFixed(2),cs=`q ${W} 0 0 ${H} 0 0 cm /Im0 Do Q`;
+    obj(pn,()=>put(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /XObject << /Im0 ${im} 0 R >> >> /Contents ${cn} 0 R >>`));
+    obj(cn,()=>put(`<< /Length ${cs.length} >>\nstream\n${cs}\nendstream`));
+    obj(im,()=>{put(`<< /Type /XObject /Subtype /Image /Width ${p.w} /Height ${p.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${p.bytes.length} >>\nstream\n`);put(p.bytes);put('\nendstream');});});
+  const n=3+3*N,xref=len;let t=`xref\n0 ${n}\n0000000000 65535 f \n`;for(let i=1;i<n;i++)t+=String(offs[i]).padStart(10,'0')+' 00000 n \n';
+  put(t+`trailer\n<< /Size ${n} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+  return new Blob(parts,{type:'application/pdf'});}
 const SIZE_SEG='<div class="lbl">Размер по длинной стороне</div><div class="seg sz"><button data-s="0">Оригинал</button><button data-s="2000">2000 px</button><button data-s="1200">1200 px</button></div>';
 function bindSizeSeg(box,cb){const bs=box.querySelectorAll('.seg.sz button');const mark=()=>bs.forEach(b=>b.classList.toggle('on',+b.dataset.s===(settings.expSize||0)));mark();
   bs.forEach(b=>b.onclick=()=>{settings.expSize=+b.dataset.s;saveSettings();mark();if(cb)cb();});}
@@ -1408,21 +1449,24 @@ async function renderExport(fmt,withNote,P=proj,IM=img,OBJ=dims,maxSide=0){
 function canShareFiles(){try{return !!(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([new Blob(['x'],{type:'image/png'})],'t.png',{type:'image/png'})]}));}catch(e){return false;}}
 async function openExport(){
   if(!proj)return;cancelAct();if(fullPromise){busy(true,'Подготовка…');await fullPromise;busy(false);}if(!proj)return;await saveNow();
-  let fmt='jpg',blob=null,gen=0,withNote=!!proj.commentOnExport;const hasNote=!!(proj.comment||'').trim();const shareOK=canShareFiles();const fname=()=>safeName(proj.name)+'_размеры.'+fmt;
+  let fmt='jpg',blob=null,gen=0,withNote=!!proj.commentOnExport;const hasNote=!!(proj.comment||'').trim();const shareOK=canShareFiles();const fname=()=>safeName(proj.name)+(fmt==='pdf'?'.pdf':'_размеры.'+fmt);
   await modal((box,close)=>{
-    box.innerHTML=`<h3>Экспорт изображения</h3><p class="note">Создаётся отдельная копия с размерами. Исходное фото в проекте не меняется.</p>
-    <div class="seg"><button data-f="jpg">JPG</button><button data-f="png">PNG</button></div>${SIZE_SEG}${hasNote?'<label class="chk"><input type="checkbox" class="wn"> Комментарий полосой под фото</label>':''}<p class="note info">Подготовка…</p>
+    box.innerHTML=`<h3>Экспорт</h3><p class="note">Создаётся отдельная копия с размерами. Исходное фото в проекте не меняется.</p>
+    <div class="seg"><button data-f="jpg">JPG</button><button data-f="png">PNG</button><button data-f="pdf">PDF</button></div><div class="szw">${SIZE_SEG}</div>${PDF_SEG}${hasNote?'<label class="chk"><input type="checkbox" class="wn"> Комментарий полосой под фото</label>':''}<p class="note info">Подготовка…</p>
     <button class="btn pri block sv" disabled>Сохранить на устройство</button>${shareOK?'<button class="btn block sh" disabled>Поделиться…</button>':''}
     <button class="btn block ghost cl">Закрыть</button>`;
     const q=s=>box.querySelector(s);
     const prep=async()=>{const my=++gen;blob=null;q('.sv').disabled=true;if(q('.sh'))q('.sh').disabled=true;q('.info').textContent='Подготовка…';
       box.querySelectorAll('.seg button[data-f]').forEach(b=>b.classList.toggle('on',b.dataset.f===fmt));
-      try{const r=await renderExport(fmt,withNote,proj,img,dims,settings.expSize||0);if(my!==gen)return;blob=r.blob;
-        q('.info').textContent=`${r.w} × ${r.h} пикс., ${(blob.size/1048576).toFixed(1)} МБ`+(r.scaled?' — уменьшено из-за ограничений браузера':'');
+      q('.szw').classList.toggle('hidden',fmt==='pdf');q('.pdfo').classList.toggle('hidden',fmt!=='pdf');
+      try{if(fmt==='pdf'){const pg=await pageJpeg(pdfPage(proj,img,dims,{...settings.pdf,note:withNote}));if(my!==gen)return;blob=buildPdf([pg]);
+          q('.info').textContent=`PDF, ${settings.pdf.paper.toUpperCase()}, ${(blob.size/1048576).toFixed(1)} МБ`;}
+        else{const r=await renderExport(fmt,withNote,proj,img,dims,settings.expSize||0);if(my!==gen)return;blob=r.blob;
+        q('.info').textContent=`${r.w} × ${r.h} пикс., ${(blob.size/1048576).toFixed(1)} МБ`+(r.scaled?' — уменьшено из-за ограничений браузера':'');}
         q('.sv').disabled=false;if(q('.sh'))q('.sh').disabled=false;}
       catch(e){if(my===gen&&q('.info'))q('.info').textContent='Не удалось создать изображение (не хватает памяти?)';}};
     box.querySelectorAll('.seg button[data-f]').forEach(b=>b.onclick=()=>{fmt=b.dataset.f;prep();});
-    bindSizeSeg(box,prep);
+    bindSizeSeg(box,prep);bindPdfSeg(box,prep);
     if(q('.wn')){q('.wn').checked=withNote;q('.wn').onchange=e=>{withNote=e.target.checked;prep();};}
     q('.sv').onclick=()=>{if(blob){download(blob,fname());toast('Файл сохранён');}};
     if(q('.sh'))q('.sh').onclick=async()=>{if(!blob)return;try{await navigator.share({files:[new File([blob],fname(),{type:blob.type})],title:proj.name});}
