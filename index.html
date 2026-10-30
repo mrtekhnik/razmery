@@ -145,6 +145,12 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
 .row2{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
 .row2 .btn{flex:1 1 auto}
 .mfoot{margin:14px 0 0;padding-top:12px;border-top:1px solid var(--line);text-align:center;font-size:12px;color:var(--muted);line-height:1.7}
+.stItems{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.stItem{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:4px 6px}
+.stItem img{width:56px;height:42px;object-fit:cover;border-radius:6px;background:#ddd}
+.stItem span{flex:1;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stItem button{width:36px;height:36px;border-radius:8px;background:#eef2f7;font-size:16px}
+.stPrev{width:100%;max-height:34vh;object-fit:contain;display:block;margin-top:10px;border-radius:8px;background:repeating-conic-gradient(#e5e8ec 0 25%,#f5f6f8 0 50%) 0 0/16px 16px}
 #busy{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center}
 #busy span{background:#fff;padding:14px 22px;border-radius:12px}
 </style>
@@ -157,6 +163,7 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
   <div class="newbar" id="newBar">
     <button class="big" id="btnGallery" data-ic="image">Из галереи</button>
     <button class="big alt" id="btnCamera" data-ic="camera">Камера</button>
+    <button class="big alt" id="btnStitch" data-ic="stitch" style="flex:0 0 54px" aria-label="Склеить фото" title="Склеить фото"></button>
   </div>
   <div class="chipsRow" id="lsChips"></div>
   <div class="srch" id="srch"><input type="search" id="srchIn" placeholder="Поиск по названию и комментарию" autocomplete="off"><button id="srchX" class="hidden" aria-label="Очистить">✕</button></div>
@@ -196,6 +203,7 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
 </div>
 
 <input type="file" id="fGallery" accept="image/*" hidden>
+<input type="file" id="fStitch" accept="image/*" multiple hidden>
 <input type="file" id="fCamera" accept="image/*" capture="environment" hidden>
 <input type="file" id="fBackup" accept=".json,.txt,application/json,text/plain" hidden>
 <div id="ov" class="hidden"><div id="mbox"></div></div>
@@ -211,7 +219,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.13',APP_DATE='29.10.2026';
+const APP_VERSION='1.14',APP_DATE='29.10.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -220,7 +228,7 @@ text:'M5 7V4h14v3M12 4v16M9 20h6',trash:'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-1
 style:'M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3c2.6 0 4.7-2.1 4.7-4.7C22 5.9 17.5 3 12 3zM7.5 11h.01M10.5 7h.01M15.5 7.5h.01',
 plus:'M12 5v14M5 12h14',minus:'M5 12h14',fit:'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
 camera:'M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',image:'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4',
-dots:'M12 5h.01M12 12h.01M12 19h.01',sync:'M20 12a8 8 0 0 1-14 5.3M4 12a8 8 0 0 1 14-5.3M18 3v4h-4M6 21v-4h4',folder:'M3 6h6l2 2h10v11H3z',restore:'M4 12a8 8 0 1 0 2.5-5.8M4 4v4h4',flip:'M7 20V4M3 8l4-4 4 4M17 4v16M13 16l4 4 4-4',note:'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5',pen:'M4 20l4-1 11-11-3-3L5 16zM14 6l3 3',edit:'M4 20h4L19 9l-4-4L4 16zM14 6l4 4'};
+dots:'M12 5h.01M12 12h.01M12 19h.01',stitch:'M3 5h8v14H3zM13 5h8v14h-8z',sync:'M20 12a8 8 0 0 1-14 5.3M4 12a8 8 0 0 1 14-5.3M18 3v4h-4M6 21v-4h4',folder:'M3 6h6l2 2h10v11H3z',restore:'M4 12a8 8 0 1 0 2.5-5.8M4 4v4h4',flip:'M7 20V4M3 8l4-4 4 4M17 4v16M13 16l4 4 4-4',note:'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5',pen:'M4 20l4-1 11-11-3-3L5 16zM14 6l3 3',edit:'M4 20h4L19 9l-4-4L4 16zM14 6l4 4'};
 const ic=n=>`<svg class="i" viewBox="0 0 24 24"${n==='dots'?' style="stroke-width:3.5"':''}><path d="${ICONS[n]}"/></svg>`;
 document.querySelectorAll('[data-ic]').forEach(el=>el.insertAdjacentHTML('afterbegin',ic(el.dataset.ic)));
 
@@ -245,7 +253,7 @@ function dbDelProject(id){const t=db.transaction(['projects','photos'],'readwrit
   t.objectStore('projects').delete(id);t.objectStore('photos').delete(id);return txDone(t);}
 
 /* ---------- настройки ---------- */
-let settings={color:'#e53935',lw:3,fs:36,halo:true,placeMode:'click3',angleRays:true,gridCols:2,ortho:true,snapPts:true,askName:true,hintOff:false,sort:'date',recent:[]};
+let settings={expSize:0,stitch:{dir:'row',gap:1,bg:'#ffffff'},color:'#e53935',lw:3,fs:36,halo:true,placeMode:'click3',angleRays:true,gridCols:2,ortho:true,snapPts:true,askName:true,hintOff:false,sort:'date',recent:[]};
 let bkInfo={lastExport:0,lastImport:0};
 async function loadBk(){try{const r=await dbGet('meta','backup');if(r&&r.value)bkInfo={...bkInfo,...r.value};}catch(e){}}
 function saveBk(){dbPut('meta',{key:'backup',value:bkInfo}).catch(()=>{});}
@@ -569,7 +577,7 @@ async function renderList(){
   em.innerHTML=trashView?`Корзина пуста.<br>Удалённые проекты хранятся здесь ${TRASH_DAYS} дней.`:curFolder?'Папка пуста.<br>Загрузите фото или переместите сюда проекты.':'Проектов пока нет.<br>Загрузите фото из галереи или сделайте снимок.';
   const mb=$('#massBar');
   if(selMode){mb.classList.remove('hidden');mb.innerHTML='';
-    [['Переместить',massMove],['Копировать',massCopy],['Экспорт фото',massExport],['Резервная копия',()=>exportBackup(new Set(selProj))],['В корзину',massTrash,'dng']]
+    [['Склеить',massStitch],['Переместить',massMove],['Копировать',massCopy],['Экспорт фото',massExport],['Резервная копия',()=>exportBackup(new Set(selProj))],['В корзину',massTrash,'dng']]
       .forEach(([l,fn,c])=>{const b=document.createElement('button');b.textContent=l;if(c)b.className=c;b.disabled=!selProj.size;b.onclick=fn;mb.appendChild(b);});}
   else mb.classList.add('hidden');}
 function folderCard(f,live){const el=document.createElement('div');el.className='proj fold';
@@ -647,17 +655,95 @@ async function massCopy(){const L=selRecs();if(!L.length)return;const r=await pi
 async function massTrash(){const L=selRecs();if(!L.length)return;
   if(!await confirmBox('Переместить в корзину?',`Проектов: ${L.length}. Восстановить можно в течение ${TRASH_DAYS} дней.`,'В корзину',true))return;
   await toTrash(L);toast(`В корзине: ${L.length}`);doneSel();}
+/* ---------- склейка ---------- */
+function xformObj(o,k,ox,oy){const P=(x,y)=>[x*k+ox,y*k+oy],c=clone(o);c.id=uid();c.lw=o.lw*k;c.fs=o.fs*k;
+  if(typeof c.x1==='number'){[c.x1,c.y1]=P(o.x1,o.y1);[c.x2,c.y2]=P(o.x2,o.y2);}
+  if(typeof c.cx==='number')[c.cx,c.cy]=P(o.cx,o.cy);
+  if(typeof c.off==='number')c.off=o.off*k;if(typeof c.r==='number')c.r=o.r*k;
+  if(o.type==='text'){[c.x,c.y]=P(o.x,o.y);if(o.tip){const t=P(o.tip.x,o.tip.y);c.tip={x:t[0],y:t[1]};}}
+  if(o.pts)c.pts=o.pts.map(q=>P(q[0],q[1]));
+  if(o.shelf){const t=P(o.shelf.x,o.shelf.y);c.shelf={x:t[0],y:t[1]};}
+  return c;}
+function stitchLayout(items,o){const n=items.length,row=o.dir==='row';
+  let T=row?Math.max(...items.map(i=>i.h)):Math.max(...items.map(i=>i.w));
+  const ks=items.map(i=>T/(row?i.h:i.w));let main=items.reduce((a,i,j)=>a+(row?i.w:i.h)*ks[j],0);
+  const gp=[0,0.015,0.04][o.gap]||0;let g=Math.round(gp*Math.max(T,main/n)),W=row?main+g*(n-1)+2*g:T+2*g,H=row?T+2*g:main+g*(n-1)+2*g;
+  const lim=Math.min(1,Math.sqrt(36e6/(W*H)),12000/Math.max(W,H));
+  const sc=lim;T*=sc;g=Math.round(g*sc);W=Math.round(W*sc);H=Math.round(H*sc);
+  let pos=g;const out=items.map((it,j)=>{const k=ks[j]*sc,iw=it.w*k,ih=it.h*k,r={k,x:row?pos:g,y:row?g:pos,w:iw,h:ih};pos+=(row?iw:ih)+g;return r;});
+  return {W,H,parts:out};}
+function renderStitch(items,o,scale=1){const L=stitchLayout(items,o),c=document.createElement('canvas');c.width=Math.max(1,Math.round(L.W*scale));c.height=Math.max(1,Math.round(L.H*scale));
+  const x=c.getContext('2d');x.fillStyle=o.bg;x.fillRect(0,0,c.width,c.height);x.imageSmoothingQuality='high';x.scale(scale,scale);
+  items.forEach((it,j)=>{const P=L.parts[j];x.drawImage(it.im,P.x,P.y,P.w,P.h);if(o.marks&&it.dims)for(const d of it.dims)drawObj(x,xformObj(d,P.k,P.x,P.y));});
+  return {c,L};}
+async function stitchDialog(items,fromProjects){
+  const o={...settings.stitch,marks:fromProjects};let prevUrl=null,res=null;
+  const r=await modal((box,close)=>{
+    box.innerHTML=`<h3>Склейка (${items.length})</h3>
+    <div class="seg dir"><button data-d="row">В ряд ⇆</button><button data-d="col">В столбец ⇅</button></div>
+    <div class="lbl">Поля между и по контуру</div><div class="seg gap"><button data-g="0">Нет</button><button data-g="1">Узкие</button><button data-g="2">Широкие</button></div>
+    <div class="lbl">Фон полей</div><div class="seg bg"><button data-b="#ffffff">Белый</button><button data-b="#000000">Чёрный</button></div>
+    ${fromProjects?'<label class="chk"><input type="checkbox" class="mk"> Перенести разметку</label>':''}
+    <div class="lbl">Порядок</div><div class="stItems"></div>
+    <img class="stPrev" alt="">
+    <p class="note info"></p>
+    ${fromProjects?'<button class="btn pri block mkp">Создать проект</button>':'<button class="btn pri block sv">Сохранить JPG</button>'+(canShareFiles()?'<button class="btn block sh">Поделиться…</button>':'')+'<button class="btn block mkp">Создать проект</button>'}
+    <button class="btn block ghost cl">Отмена</button>`;
+    const q=x=>box.querySelector(x);
+    const list=()=>{const el=q('.stItems');el.innerHTML='';items.forEach((it,j)=>{const d=document.createElement('div');d.className='stItem';
+      d.innerHTML=`<img src="${it.im.src}"><span></span><button data-u="${j}" ${j?'':'disabled'}>↑</button><button data-v="${j}" ${j<items.length-1?'':'disabled'}>↓</button>`;
+      d.querySelector('span').textContent=it.name;el.appendChild(d);});
+      el.querySelectorAll('[data-u]').forEach(b=>b.onclick=()=>{const j=+b.dataset.u;[items[j-1],items[j]]=[items[j],items[j-1]];list();prev();});
+      el.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{const j=+b.dataset.v;[items[j+1],items[j]]=[items[j],items[j+1]];list();prev();});};
+    const mark=()=>{box.querySelectorAll('.dir button').forEach(b=>b.classList.toggle('on',b.dataset.d===o.dir));
+      box.querySelectorAll('.gap button').forEach(b=>b.classList.toggle('on',+b.dataset.g===o.gap));
+      box.querySelectorAll('.bg button').forEach(b=>b.classList.toggle('on',b.dataset.b===o.bg));};
+    const prev=()=>{mark();const L=stitchLayout(items,o),sc=Math.min(1,900/Math.max(L.W,L.H));const {c}=renderStitch(items,o,sc);
+      c.toBlob(b=>{if(prevUrl)URL.revokeObjectURL(prevUrl);prevUrl=URL.createObjectURL(b);const im=q('.stPrev');if(im)im.src=prevUrl;},'image/jpeg',0.8);
+      q('.info').textContent=`Результат: ${L.W} × ${L.H} пикс.`;settings.stitch={dir:o.dir,gap:o.gap,bg:o.bg};saveSettings();};
+    box.querySelectorAll('.dir button').forEach(b=>b.onclick=()=>{o.dir=b.dataset.d;prev();});
+    box.querySelectorAll('.gap button').forEach(b=>b.onclick=()=>{o.gap=+b.dataset.g;prev();});
+    box.querySelectorAll('.bg button').forEach(b=>b.onclick=()=>{o.bg=b.dataset.b;prev();});
+    if(q('.mk')){q('.mk').checked=true;q('.mk').onchange=e=>{o.marks=e.target.checked;prev();};}
+    const full=async()=>{busy(true,'Склейка…');try{const {c}=renderStitch(items,o,1);const b=await toBlob(c,'image/jpeg',0.92);c.width=c.height=0;return b;}finally{busy(false);}};
+    const name=()=>'Склейка: '+items.map(i=>i.name).join(' + ');
+    q('.mkp').onclick=()=>close({act:'proj'});
+    if(q('.sv'))q('.sv').onclick=async()=>{const b=await full();download(b,safeName(name())+'.jpg');toast('Файл сохранён');};
+    if(q('.sh'))q('.sh').onclick=async()=>{const b=await full();try{await navigator.share({files:[new File([b],safeName(name())+'.jpg',{type:'image/jpeg'})]});}catch(e){if(e.name!=='AbortError')toast('Не удалось поделиться');}};
+    q('.cl').onclick=()=>close(null);list();prev();});
+  if(prevUrl)URL.revokeObjectURL(prevUrl);
+  if(!r||r.act!=='proj')return;
+  busy(true,'Создание проекта…');
+  try{const {c,L}=renderStitch(items,{...o,marks:false},1);const blob=await toBlob(c,'image/jpeg',0.92);c.width=c.height=0;
+    const objs=o.marks?items.flatMap((it,j)=>(it.dims||[]).map(d=>xformObj(d,L.parts[j].k,L.parts[j].x,L.parts[j].y))):[];
+    const im=await loadImg(blob),now=Date.now(),id=uid();
+    const p={id,name:('Склейка: '+items.map(i=>i.name).join(' + ')).slice(0,120),created:now,modified:now,w:im.naturalWidth,h:im.naturalHeight,dims:objs,folderId:curFolder};
+    p.thumb=await makeThumb(im,p,objs);const preview=await makePreview(im,p.w,p.h);URL.revokeObjectURL(im.src);
+    await dbPutMany([['projects',p],['photos',{id,blob,preview}]]);busy(false);selMode=false;selProj.clear();openEditor(id);}
+  catch(e){busy(false);alertBox('Ошибка','Не удалось склеить: не хватает памяти. Попробуйте меньше изображений.');}}
+async function massStitch(){const L=selRecs();if(L.length<2||L.length>4){toast('Для склейки выберите от 2 до 4 проектов');return;}
+  busy(true,'Подготовка…');const items=[];
+  try{for(const p of L){const ph=await dbGet('photos',p.id);if(!ph)continue;items.push({im:await loadImg(ph.blob),w:p.w,h:p.h,dims:p.dims||[],name:p.name});}}
+  catch(e){busy(false);toast('Не удалось загрузить фото');return;}
+  busy(false);try{await stitchDialog(items,true);}finally{items.forEach(i=>URL.revokeObjectURL(i.im.src));}}
+$('#btnStitch').onclick=()=>$('#fStitch').click();
+$('#fStitch').onchange=async e=>{const fs=[...e.target.files];e.target.value='';if(!fs.length)return;
+  if(fs.length<2||fs.length>4){alertBox('Склейка фото','Выберите от 2 до 4 изображений (удерживайте палец на фото в галерее, чтобы выбрать несколько).');return;}
+  busy(true,'Загрузка…');const items=[];
+  try{for(const f of fs){const im=await loadImg(f);items.push({im,w:im.naturalWidth,h:im.naturalHeight,name:f.name.replace(/\.[^.]+$/,'')});}}
+  catch(e){busy(false);items.forEach(i=>URL.revokeObjectURL(i.im.src));alertBox('Ошибка','Не удалось открыть одно из изображений.');return;}
+  busy(false);try{await stitchDialog(items,false);}finally{items.forEach(i=>URL.revokeObjectURL(i.im.src));}};
 async function massExport(){const L=selRecs();if(!L.length)return;
   const fmt=await modal((box,close)=>{let f='jpg';
-    box.innerHTML=`<h3>Экспорт изображений</h3><p class="txt">Проектов: ${L.length}</p><div class="seg"><button data-f="jpg" class="on">JPG</button><button data-f="png">PNG</button></div>
+    box.innerHTML=`<h3>Экспорт изображений</h3><p class="txt">Проектов: ${L.length}</p><div class="seg"><button data-f="jpg" class="on">JPG</button><button data-f="png">PNG</button></div>${SIZE_SEG}
     <p class="note">Комментарий добавляется к тем проектам, где включено «печатать на экспортируемом изображении». Исходные фото не меняются.</p>
     <div class="mbtns"><button class="btn" data-a="c">Отмена</button><button class="btn pri" data-a="ok">Подготовить</button></div>`;
-    box.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{f=b.dataset.f;box.querySelectorAll('.seg button').forEach(x=>x.classList.toggle('on',x===b));});
+    box.querySelectorAll('.seg button[data-f]').forEach(b=>b.onclick=()=>{f=b.dataset.f;box.querySelectorAll('.seg button[data-f]').forEach(x=>x.classList.toggle('on',x===b));});bindSizeSeg(box);
     box.querySelector('[data-a=c]').onclick=()=>close(null);box.querySelector('[data-a=ok]').onclick=()=>close(f);});
   if(!fmt)return;const files=[],used=new Set();
   try{for(let i=0;i<L.length;i++){busy(true,`Подготовка ${i+1} из ${L.length}…`);const p=L[i],ph=await dbGet('photos',p.id);if(!ph)continue;
       const im=await loadImg(ph.blob);
-      try{const r=await renderExport(fmt,!!p.commentOnExport,p,im,p.dims||[]);let base=safeName(p.name)+'_размеры',nm=base,k=2;
+      try{const r=await renderExport(fmt,!!p.commentOnExport,p,im,p.dims||[],settings.expSize||0);let base=safeName(p.name)+'_размеры',nm=base,k=2;
         while(used.has(nm))nm=`${base} (${k++})`;used.add(nm);files.push(new File([r.blob],nm+'.'+fmt,{type:r.blob.type}));}
       finally{URL.revokeObjectURL(im.src);}}}
   catch(e){busy(false);alertBox('Ошибка','Не удалось подготовить изображения (не хватает памяти?).');return;}
@@ -1155,9 +1241,12 @@ function openSettings(tab){return modal((box,close)=>{
 function wrapText(c,text,maxW){const out=[];
   for(const para of text.split('\n')){let line='';for(const w of para.split(/\s+/)){const t=line?line+' '+w:w;if(c.measureText(t).width<=maxW||!line)line=t;else{out.push(line);line=w;}}out.push(line);}
   return out;}
-async function renderExport(fmt,withNote,P=proj,IM=img,OBJ=dims){
-  let w=P.w,h=P.h,scaled=false;const k=Math.min(1,Math.sqrt(36e6/(w*h)),16000/Math.max(w,h));
-  if(k<1){scaled=true;w=Math.round(w*k);h=Math.round(h*k);}
+const SIZE_SEG='<div class="lbl">Размер по длинной стороне</div><div class="seg sz"><button data-s="0">Оригинал</button><button data-s="2000">2000 px</button><button data-s="1200">1200 px</button></div>';
+function bindSizeSeg(box,cb){const bs=box.querySelectorAll('.seg.sz button');const mark=()=>bs.forEach(b=>b.classList.toggle('on',+b.dataset.s===(settings.expSize||0)));mark();
+  bs.forEach(b=>b.onclick=()=>{settings.expSize=+b.dataset.s;saveSettings();mark();if(cb)cb();});}
+async function renderExport(fmt,withNote,P=proj,IM=img,OBJ=dims,maxSide=0){
+  let w=P.w,h=P.h,scaled=false;const kl=Math.min(1,Math.sqrt(36e6/(w*h)),16000/Math.max(w,h)),k=Math.min(kl,maxSide?maxSide/Math.max(w,h):1);
+  if(k<1){scaled=kl<1&&k===kl;w=Math.round(w*k);h=Math.round(h*k);}
   const note=withNote?(P.comment||'').trim():'';let band=null;
   const NF=f=>`${f}px system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif`;
   if(note){const fsN=Math.max(14,Math.round(Math.max(w,h)/55)),pad=Math.round(fsN*0.9);mctx.font=NF(fsN);
@@ -1177,17 +1266,18 @@ async function openExport(){
   let fmt='jpg',blob=null,gen=0,withNote=!!proj.commentOnExport;const hasNote=!!(proj.comment||'').trim();const shareOK=canShareFiles();const fname=()=>safeName(proj.name)+'_размеры.'+fmt;
   await modal((box,close)=>{
     box.innerHTML=`<h3>Экспорт изображения</h3><p class="note">Создаётся отдельная копия с размерами. Исходное фото в проекте не меняется.</p>
-    <div class="seg"><button data-f="jpg">JPG</button><button data-f="png">PNG</button></div>${hasNote?'<label class="chk"><input type="checkbox" class="wn"> Комментарий полосой под фото</label>':''}<p class="note info">Подготовка…</p>
+    <div class="seg"><button data-f="jpg">JPG</button><button data-f="png">PNG</button></div>${SIZE_SEG}${hasNote?'<label class="chk"><input type="checkbox" class="wn"> Комментарий полосой под фото</label>':''}<p class="note info">Подготовка…</p>
     <button class="btn pri block sv" disabled>Сохранить на устройство</button>${shareOK?'<button class="btn block sh" disabled>Поделиться…</button>':''}
     <button class="btn block ghost cl">Закрыть</button>`;
     const q=s=>box.querySelector(s);
     const prep=async()=>{const my=++gen;blob=null;q('.sv').disabled=true;if(q('.sh'))q('.sh').disabled=true;q('.info').textContent='Подготовка…';
-      box.querySelectorAll('.seg button').forEach(b=>b.classList.toggle('on',b.dataset.f===fmt));
-      try{const r=await renderExport(fmt,withNote);if(my!==gen)return;blob=r.blob;
+      box.querySelectorAll('.seg button[data-f]').forEach(b=>b.classList.toggle('on',b.dataset.f===fmt));
+      try{const r=await renderExport(fmt,withNote,proj,img,dims,settings.expSize||0);if(my!==gen)return;blob=r.blob;
         q('.info').textContent=`${r.w} × ${r.h} пикс., ${(blob.size/1048576).toFixed(1)} МБ`+(r.scaled?' — уменьшено из-за ограничений браузера':'');
         q('.sv').disabled=false;if(q('.sh'))q('.sh').disabled=false;}
       catch(e){if(my===gen&&q('.info'))q('.info').textContent='Не удалось создать изображение (не хватает памяти?)';}};
-    box.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{fmt=b.dataset.f;prep();});
+    box.querySelectorAll('.seg button[data-f]').forEach(b=>b.onclick=()=>{fmt=b.dataset.f;prep();});
+    bindSizeSeg(box,prep);
     if(q('.wn')){q('.wn').checked=withNote;q('.wn').onchange=e=>{withNote=e.target.checked;prep();};}
     q('.sv').onclick=()=>{if(blob){download(blob,fname());toast('Файл сохранён');}};
     if(q('.sh'))q('.sh').onclick=async()=>{if(!blob)return;try{await navigator.share({files:[new File([blob],fname(),{type:blob.type})],title:proj.name});}
