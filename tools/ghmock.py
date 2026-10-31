@@ -1,5 +1,6 @@
 # Имитация нужной части GitHub REST API (Git Data + contents raw) для теста синхронизации
-import json,hashlib,base64,re,sys
+import json,hashlib,base64,re,sys,time
+DELAY=float(sys.argv[2]) if len(sys.argv)>2 else 0  # задержка ответа, с (имитация медленной сети)
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 blobs={};trees={};commits={};ref={'sha':None};TOKEN='test-token';stats={'blobs':0}
 def h(b):return hashlib.sha1(b).hexdigest()
@@ -12,6 +13,8 @@ class H(BaseHTTPRequestHandler):
     def cors(self):
         self.send_header('Access-Control-Allow-Origin','*');self.send_header('Access-Control-Allow-Headers','Authorization, Accept, Content-Type');self.send_header('Access-Control-Allow-Methods','GET, POST, PATCH, OPTIONS')
     def out(self,code,obj=None,raw=None):
+        stats['req']=stats.get('req',0)+1
+        if DELAY:time.sleep(DELAY)
         self.send_response(code);self.cors()
         body=raw if raw is not None else json.dumps(obj or {}).encode()
         self.send_header('Content-Type','application/octet-stream' if raw is not None else 'application/json');self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
@@ -24,6 +27,7 @@ class H(BaseHTTPRequestHandler):
         if not self.auth():return
         m=re.match(r'^/repos/([^/]+/[^/]+)(.*)$',self.path.split('?')[0]);p=m.group(2)
         if p=='':return self.out(200,{'private':True,'full_name':m.group(1)})
+        if p=='/_stats':return self.out(200,stats)
         if p=='/git/ref/heads/main':return self.out(200,{'object':{'sha':ref['sha']}})
         mm=re.match(r'^/git/commits/(\w+)$',p)
         if mm:c=commits[mm.group(1)];return self.out(200,{'sha':mm.group(1),'tree':{'sha':c['tree']}})
@@ -41,7 +45,8 @@ class H(BaseHTTPRequestHandler):
         if p=='/git/trees':
             m=dict(trees[b['base_tree']])
             for e in b['tree']:
-                if e['sha'] is None:m.pop(e['path'],None)
+                if 'content' in e:m[e['path']]=mkblob(e['content'].encode())
+                elif e['sha'] is None:m.pop(e['path'],None)
                 else:m[e['path']]=e['sha']
             return self.out(201,{'sha':mktree(m)})
         if p=='/git/commits':return self.out(201,{'sha':mkcommit(b['tree'],b['parents'])})
