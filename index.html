@@ -181,6 +181,7 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
 #subBar button span{font-size:11px;opacity:.85}
 #subBar button.on{background:var(--accent);color:#fff}
 #subBar button.sty{flex:0 0 46px;background:transparent}
+#subBar button.sty.own span{color:#7cc4ff;font-weight:600}
 #subBar button.sty i{width:18px;height:18px;border-radius:50%;display:block;margin-bottom:3px}
 #ctxBar{display:flex;gap:4px;background:#161b21;padding:6px 6px 0}
 #ctxBar button{flex:1;min-width:0;height:48px;border-radius:6px;background:rgba(255,255,255,.08);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:10.5px;line-height:1.1}
@@ -278,7 +279,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.35',APP_DATE='31.10.2026';
+const APP_VERSION='1.36',APP_DATE='31.10.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -1302,7 +1303,7 @@ function updateUI(){if(!proj)return;
     :mode==='text'?[['plain','Т','Текст'],['leader','Т↙','С выноской']]:null;
   const attr=mode==='create'?'k':mode==='draw'?'t':'l',cur=mode==='create'?dimKind:mode==='draw'?tool:labelMode;
   if(kinds){sub.innerHTML=kinds.map(([k,sym,l])=>`<button data-${attr}="${k}" class="${cur===k?'on':''}"><b>${sym}</b><span>${l}</span></button>`).join('')
-      +(n||(mode==='draw'&&tool==='blur')?'':`<button data-b="st" class="sty" title="Стиль новых объектов"><i style="background:${settings.color};box-shadow:0 0 0 ${Math.min(4,Math.max(1.5,settings.lw/2))}px rgba(255,255,255,.35)"></i><span>Стиль</span></button>`);sub.classList.remove('hidden');}
+      +(n||(mode==='draw'&&tool==='blur')?'':`<button data-b="st" class="sty${proj.style&&proj.style[styleGrp()]?' own':''}" title="Стиль новых объектов в этом файле"><i style="background:${effStyle().color};box-shadow:0 0 0 ${Math.min(4,Math.max(1.5,effStyle().lw/2))}px rgba(255,255,255,.35)"></i><span>Стиль</span></button>`);sub.classList.remove('hidden');}
   else sub.classList.add('hidden');
   const ab=(b,icon,label,cls)=>`<button data-b="${b}" class="${cls||''}">${ic(icon)}<span>${label}</span></button>`;const a=[];
   if(n){a.push(`<button data-b="x" class="cnt" title="Снять выбор">✕ ${n}</button>`);
@@ -1356,19 +1357,20 @@ function dupSel(){const L=selList();if(!L.length)return;pushHistory();const out=
   dims.push(...out);selSet=new Set(out.map(o=>o.id));changed();toast(out.length>1?`Скопировано: ${out.length}`:'Скопировано');}
 let styleOpen=null;
 function closeStyle(){if(!styleOpen)return;const st=styleOpen;styleOpen=null;$('#stylePanel').classList.add('hidden');$('#stylePanel').innerHTML='';
-  if(st.defs){if(st.touched){saveSettings();toast('Стиль сохранён — так будут выглядеть новые объекты');}updateUI();return;}
+  if(st.defs){updateUI();return;}
   if(st.touched&&proj){pushHistory(st.before);changed();}else updateUI();}
 function quickStyle(){if(styleOpen){closeStyle();return;}if(!proj)return;const L=selList(),defs=!L.length;closeMore();const base=Math.max(proj.w,proj.h)/1000;
-  const f=defs?{color:settings.color,lw:settings.lw*base,fs:settings.fs*base,halo:settings.halo}:L[0];
+  const g=styleGrp(),e0=effStyle(g),f=defs?{color:e0.color,lw:e0.lw*base,fs:e0.fs*base,halo:e0.halo}:L[0];
   styleOpen={before:JSON.stringify(dims),touched:false,ids:L.map(o=>o.id).join(),defs};
   const COLORS=['#e53935','#ffd600','#00c853','#2979ff','#ff6d00','#ffffff','#111111'];
   const el=$('#stylePanel');const lw0=Math.round(f.lw/base*2)/2,fs0=Math.round(f.fs/base);
-  el.innerHTML=`${defs?'<div class="row"><b class="t" style="width:auto">Стиль новых объектов</b></div>':''}<div class="row"><div class="sws"></div></div>
+  el.innerHTML=`${defs?`<div class="row"><b class="t" style="width:auto;flex:1">Стиль ${STYLE_NAMES[g]} в этом файле</b><button class="rs" style="${proj.style&&proj.style[g]?'':'display:none'}">Как в Настройках</button></div>`:''}<div class="row"><div class="sws"></div></div>
   <div class="row"><label class="t">Толщина</label><input type="range" class="lw" min="1" max="12" step="0.5" value="${lw0}"><span class="v lwv">${lw0}</span></div>
   <div class="row"><label class="t">Шрифт</label><input type="range" class="fs" min="12" max="100" step="1" value="${fs0}"><span class="v fsv">${fs0}</span></div>
   <div class="row"><label class="chk"><input type="checkbox" class="halo"> Контрастная обводка</label><button class="ok">Готово</button></div>`;
   const q=x=>el.querySelector(x);
-  const apply=(k,v,raw)=>{styleOpen.touched=true;f[k]=v;if(defs){settings[k]=raw!==undefined?raw:v;saveSettings();updateUI();}else for(const o of L)o[k]=v;render();};
+  const apply=(k,v,raw)=>{styleOpen.touched=true;f[k]=v;
+    if(defs){const st=effStyle(g);st[k]=raw!==undefined?raw:v;proj.style={...(proj.style||{}),[g]:st};const rb=q('.rs');if(rb)rb.style.display='';changed();}else for(const o of L)o[k]=v;render();};
   const sws=q('.sws');const drawSw=()=>{sws.innerHTML='';for(const c of COLORS){const b=document.createElement('button');b.className='sw'+((defs?f.color===c:L.every(o=>o.color===c))?' on':'');b.style.background=c;
       b.onclick=()=>{apply('color',c);drawSw();};sws.appendChild(b);}
     const lab=document.createElement('label');lab.className='sw';lab.style.background='conic-gradient(red,yellow,lime,cyan,blue,magenta,red)';lab.innerHTML='<input type="color">';
@@ -1378,12 +1380,13 @@ function quickStyle(){if(styleOpen){closeStyle();return;}if(!proj)return;const L
   q('.fs').oninput=e=>{q('.fsv').textContent=e.target.value;apply('fs',+e.target.value*base,+e.target.value);};
   q('.halo').onchange=e=>apply('halo',e.target.checked);
   q('.ok').onclick=()=>closeStyle();
+  if(defs)q('.rs').onclick=()=>{if(proj.style){delete proj.style[g];if(!Object.keys(proj.style).length)delete proj.style;}changed();closeStyle();toast('Стиль '+STYLE_NAMES[g]+' — как в Настройках');};
   el.classList.remove('hidden');updateUI();}
 function flipSel(){const L=selList().filter(o=>isDim(o)||o.type==='angle');if(!L.length)return;pushHistory();
   L.forEach(o=>{if(isDim(o))o.off=-o.off;else if(o.type==='angle')o.rev=!o.rev;else o.ts=-(o.ts||1);});changed();}
 
-function makeDim(a,b){const base=Math.max(proj.w,proj.h)/1000;
-  const d={id:uid(),x1:a.x,y1:a.y,x2:b.x,y2:b.y,off:0,text:'',color:settings.color,lw:settings.lw*base,fs:settings.fs*base,halo:settings.halo};
+function makeDim(a,b){
+  const d={...newBase('dim'),x1:a.x,y1:a.y,x2:b.x,y2:b.y,off:0,text:''};
   const g=dimGeom(d);if(g){const pref=g.ny>1e-6?-1:(g.ny<-1e-6?1:(g.nx>0?-1:1));
     const fits=sg=>[sg*d.fs*1.6,sg*d.fs*2.9].every(o=>[[d.x1,d.y1],[d.x2,d.y2]].every(([x,y])=>{const px=x+g.nx*o,py=y+g.ny*o;return px>=0&&py>=0&&px<=proj.w&&py<=proj.h;}));
     const sg=fits(pref)?pref:(fits(-pref)?-pref:pref);d.off=sg*d.fs*1.6;}return d;}
@@ -1547,7 +1550,14 @@ function handleMove(p){const ip=toImg(p),x=ip.x+act.gx,y=ip.y+act.gy,o=act.d;
     if(act.h==='v'){o.cx=c.x;o.cy=c.y;}else if(act.h==='p1'||act.h==='a'){o.x1=c.x;o.y1=c.y;}else if(act.h==='p2'||act.h==='b'){o.x2=c.x;o.y2=c.y;}else if(act.h==='tip')o.tip={x:c.x,y:c.y};
     loupe=act.touchy?{ix:c.x,iy:c.y,sx:p.x,sy:p.y}:null;}
   render();}
-function newBase(){const base=Math.max(proj.w,proj.h)/1000;return {id:uid(),color:settings.color,lw:settings.lw*base,fs:settings.fs*base,halo:settings.halo};}
+/* стиль файла: свой для размеров, надписей и рисунка; если не задан — из Настроек */
+const styleGrp=()=>mode==='text'?'text':mode==='draw'?'draw':'dim';
+const STYLE_NAMES={dim:'размеров',text:'надписей',draw:'рисунка'};
+function effStyle(g=styleGrp()){const st=proj&&proj.style&&proj.style[g];const d={color:settings.color,lw:settings.lw,fs:settings.fs,halo:settings.halo};return st?{...d,...st}:d;}
+function newBase(g){const base=Math.max(proj.w,proj.h)/1000,st=effStyle(g);return {id:uid(),color:st.color,lw:st.lw*base,fs:st.fs*base,halo:st.halo};}
+function validStyle(v){if(!v||typeof v!=='object')return null;const o={};
+  for(const g of ['dim','text','draw']){const x=v[g];if(x&&/^#[0-9a-f]{6}$/i.test(x.color||'')&&isNum(x.lw)&&isNum(x.fs)&&x.lw>0&&x.fs>0)o[g]={color:x.color,lw:x.lw,fs:x.fs,halo:x.halo!==false};}
+  return Object.keys(o).length?o:null;}
 function startDraw(p){const ip=clampImg(toImg(p)),o={...newBase(),type:tool};
   if(tool==='pen')o.pts=[[ip.x,ip.y]];else{o.x1=o.x2=ip.x;o.y1=o.y2=ip.y;}
   pendingObj=o;act={k:'draw',lastS:p};render();}
@@ -1956,7 +1966,7 @@ async function importBackup(file){
         if(policy==='copy'){id=uid();name=uniq(name+' (копия)',fk);added++;}else replaced++;}
       else{if(exNames.has(fk+'|'+name))name=uniq(name+' (восстановлен)',fk);added++;}
       const now=Date.now();
-      const rec={id,name,created:isNum(p.created)?p.created:now,modified:isNum(p.modified)?p.modified:now,w:p.w,h:p.h,dims:p.dims.map(cleanObj),comment:typeof p.comment==='string'?p.comment:'',commentOnExport:!!p.commentOnExport,folderId:typeof p.folderId==='string'&&fIds.has(p.folderId)?p.folderId:null};if(p._xf)rec.xf=p._xf;
+      const rec={id,name,created:isNum(p.created)?p.created:now,modified:isNum(p.modified)?p.modified:now,w:p.w,h:p.h,dims:p.dims.map(cleanObj),comment:typeof p.comment==='string'?p.comment:'',commentOnExport:!!p.commentOnExport,folderId:typeof p.folderId==='string'&&fIds.has(p.folderId)?p.folderId:null};if(p._xf)rec.xf=p._xf;{const st=validStyle(p.style);if(st)rec.style=st;}
       if(p.src&&typeof p.src.f==='string'&&isNum(p.src.pg)&&isNum(p.src.pw)&&isNum(p.src.ph))rec.src={f:p.src.f,pg:p.src.pg,pw:p.src.pw,ph:p.src.ph};
       if(p.grp&&typeof p.grp.id==='string'&&typeof p.grp.name==='string'&&isNum(p.grp.n))rec.grp={id:policy==='copy'&&exIds.has(p.id)?p.grp.id+'c':p.grp.id,name:p.grp.name,n:p.grp.n};
       rec.thumb=await makeThumb(p._im,rec,rec.dims);items.push(['projects',rec],['photos',{id,blob:p._blob}]);}
