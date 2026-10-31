@@ -276,7 +276,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.29',APP_DATE='29.10.2026';
+const APP_VERSION='1.30',APP_DATE='29.10.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -1296,8 +1296,10 @@ function handleDiamond(p){const r=11;ctx.beginPath();ctx.moveTo(p.x,p.y-r);ctx.l
   ctx.fillStyle='#1f6feb';ctx.fill();ctx.lineWidth=2.5;ctx.strokeStyle='#fff';ctx.stroke();}
 function drawSnap(){if(!snapMark)return;const p=toScr(snapMark.x,snapMark.y);ctx.save();
   if(snapMark.k==='pt'){ctx.strokeStyle='#00e676';ctx.lineWidth=2.5;ctx.strokeRect(p.x-9,p.y-9,18,18);}
+  else if(snapMark.k==='edge'){}
   else{const b=toScr(snapMark.bx,snapMark.by);ctx.setLineDash([5,5]);ctx.strokeStyle='#00e676';ctx.lineWidth=1.5;ctx.beginPath();
     if(snapMark.k==='h'){ctx.moveTo(0,b.y);ctx.lineTo(cw,b.y);}else{ctx.moveTo(b.x,0);ctx.lineTo(b.x,ch);}ctx.stroke();}
+  if(snapMark.edge||snapMark.k==='edge'){ctx.setLineDash([]);ctx.strokeStyle='#18ffff';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(p.x,p.y,8,0,Math.PI*2);ctx.stroke();}
   ctx.restore();}
 function drawOverlay(){drawSnap();
   const L=selList(),one=L.length===1;
@@ -1366,7 +1368,25 @@ function snap(ip,base,skip){snapMark=null;let r={x:ip.x,y:ip.y};
     if(L*view.s>12){const a=Math.abs(Math.atan2(dy,dx))*180/Math.PI,T=Math.min(4,settings.orthoDeg||2);
       if(a<T||a>180-T){r={x:ip.x,y:base.y};snapMark={x:r.x,y:r.y,k:'h',bx:base.x,by:base.y};}
       else if(Math.abs(a-90)<T){r={x:base.x,y:ip.y};snapMark={x:r.x,y:r.y,k:'v',bx:base.x,by:base.y};}}}
+  if(settings.edgeSnap!==false){const e=edgeSnap(r,snapMark&&snapMark.k==='h'?'x':snapMark&&snapMark.k==='v'?'y':null);
+    if(e){r=e;snapMark=snapMark?{...snapMark,x:e.x,y:e.y,edge:true}:{x:e.x,y:e.y,k:'edge'};}}
   return clampImg(r);}
+// Привязка к краям на изображении: ищем самую резкую смену яркости рядом с точкой (в пределах ~18 px экрана)
+let edgeCv=null;
+function edgeSnap(pt,axis){if(!img||!proj)return null;const R=18,N=2*R+1,k=img.naturalWidth/proj.w,ri=R/view.s;
+  if(!edgeCv){edgeCv=document.createElement('canvas');edgeCv.width=edgeCv.height=N;}
+  const x=edgeCv.getContext('2d',{willReadFrequently:true});x.fillStyle='#fff';x.fillRect(0,0,N,N);
+  try{x.drawImage(img,(pt.x-ri)*k,(pt.y-ri)*k,2*ri*k,2*ri*k,0,0,N,N);}catch(e){return null;}
+  const d=x.getImageData(0,0,N,N).data,g=new Float32Array(N*N);
+  for(let i=0;i<N*N;i++)g[i]=0.299*d[i*4]+0.587*d[i*4+1]+0.114*d[i*4+2];
+  const at=(i,j)=>g[j*N+i],cand=[];let mx=0;
+  const test=(i,j)=>{if(i<1||j<1||i>N-2||j>N-2)return;const gx=at(i+1,j)-at(i-1,j),gy=at(i,j+1)-at(i,j-1);
+    const m=axis==='x'?Math.abs(gx):axis==='y'?Math.abs(gy):Math.max(Math.abs(gx),Math.abs(gy)),dist=Math.hypot(i-R,j-R);if(dist>R||m<28)return;
+    cand.push([i,j,m,dist]);if(m>mx)mx=m;};
+  if(axis==='x')for(let i=1;i<N-1;i++)test(i,R);else if(axis==='y')for(let j=1;j<N-1;j++)test(R,j);
+  else for(let j=1;j<N-1;j++)for(let i=1;i<N-1;i++)test(i,j);
+  let best=null,bd=Infinity;for(const c of cand)if(c[2]>=mx*0.6){const sc=c[3]-c[2]/mx*0.5;if(sc<bd){bd=sc;best=c;}}
+  if(!best)return null;const s=2*ri/N;return {x:pt.x+(best[0]-R)*s,y:pt.y+(best[1]-R)*s};}
 function placeAt(p){const ip=snap(clampImg(toImg(p)),tmpP1);act.ip=ip;if(tmpP1)pendingDim=makeDim(tmpP1,ip);
   loupe=act.touchy?{ix:ip.x,iy:ip.y,sx:p.x,sy:p.y}:null;render();}
 function offsetAt(p){const d=pendingDim;if(!d)return;const ip=toImg(p),g=dimGeom(d);if(g)d.off=(ip.x-d.x1)*g.nx+(ip.y-d.y1)*g.ny;render();}
@@ -1525,6 +1545,7 @@ function openSettings(tab){return modal((box,close)=>{
   <div class="lbl" style="margin-top:6px">Орто — притяжение к горизонтали и вертикали</div>
   <div class="seg orth"><button data-o="0">Выкл</button><button data-o="0.5">0,5°</button><button data-o="1">1°</button><button data-o="2">2°</button><button data-o="4">4°</button></div>
   <p class="note">Линия, отклонённая от горизонтали или вертикали меньше чем на заданный угол, выравнивается точно. Если фото снято с наклоном — сначала выровняйте его через ✂.</p>
+  <label class="chk"><input type="checkbox" class="edg"> Привязка к краям на фото и линиям чертежа</label>
   <label class="chk"><input type="checkbox" class="snp"> Привязка к точкам других размеров и стрелок</label>
   <div class="lbl">Проекты</div>
   <label class="chk"><input type="checkbox" class="askn"> Спрашивать название при создании проекта</label>
@@ -1557,7 +1578,7 @@ function openSettings(tab){return modal((box,close)=>{
   const ck=(cls,key,def)=>{const el=box.querySelector(cls);el.checked=settings[key]===undefined?def:!!settings[key];el.onchange=()=>{settings[key]=el.checked;saveSettings();};};
   {const bs=box.querySelectorAll('.orth button'),cur=()=>settings.ortho===false?0:Math.min(4,settings.orthoDeg||2),mk=()=>bs.forEach(b=>b.classList.toggle('on',+b.dataset.o===cur()));mk();
     bs.forEach(b=>b.onclick=()=>{const v=+b.dataset.o;settings.ortho=v>0;if(v)settings.orthoDeg=v;saveSettings();mk();});}
-  ck('.snp','snapPts',true);ck('.askn','askName',true);
+  ck('.snp','snapPts',true);ck('.edg','edgeSnap',true);ck('.askn','askName',true);
   {const bs=box.querySelectorAll('.sd button'),mk=()=>bs.forEach(b=>b.classList.toggle('on',+b.dataset.d===(settings.syncDelay??3600000)));mk();bs.forEach(b=>b.onclick=()=>{settings.syncDelay=+b.dataset.d;saveSettings();mk();});}
   ck('.adjl','adjustOnLoad',true);
   {const el=box.querySelector('.hnt');el.checked=!settings.hintOff;el.onchange=()=>{settings.hintOff=!el.checked;saveSettings();if(proj)updateUI();};}
