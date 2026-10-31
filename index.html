@@ -278,7 +278,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.34',APP_DATE='31.10.2026';
+const APP_VERSION='1.35',APP_DATE='31.10.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -1368,14 +1368,14 @@ function quickStyle(){if(styleOpen){closeStyle();return;}if(!proj)return;const L
   <div class="row"><label class="t">Шрифт</label><input type="range" class="fs" min="12" max="100" step="1" value="${fs0}"><span class="v fsv">${fs0}</span></div>
   <div class="row"><label class="chk"><input type="checkbox" class="halo"> Контрастная обводка</label><button class="ok">Готово</button></div>`;
   const q=x=>el.querySelector(x);
-  const apply=(k,v)=>{styleOpen.touched=true;f[k]=v;if(defs)settings[k]=k==='lw'||k==='fs'?v/base:v;else for(const o of L)o[k]=v;render();};
+  const apply=(k,v,raw)=>{styleOpen.touched=true;f[k]=v;if(defs){settings[k]=raw!==undefined?raw:v;saveSettings();updateUI();}else for(const o of L)o[k]=v;render();};
   const sws=q('.sws');const drawSw=()=>{sws.innerHTML='';for(const c of COLORS){const b=document.createElement('button');b.className='sw'+((defs?f.color===c:L.every(o=>o.color===c))?' on':'');b.style.background=c;
       b.onclick=()=>{apply('color',c);drawSw();};sws.appendChild(b);}
     const lab=document.createElement('label');lab.className='sw';lab.style.background='conic-gradient(red,yellow,lime,cyan,blue,magenta,red)';lab.innerHTML='<input type="color">';
     const ci=lab.querySelector('input');ci.value=f.color;ci.oninput=()=>{apply('color',ci.value);lab.style.background=ci.value;};sws.appendChild(lab);};drawSw();
   q('.halo').checked=f.halo!==false;
-  q('.lw').oninput=e=>{q('.lwv').textContent=e.target.value;apply('lw',+e.target.value*base);};
-  q('.fs').oninput=e=>{q('.fsv').textContent=e.target.value;apply('fs',+e.target.value*base);};
+  q('.lw').oninput=e=>{q('.lwv').textContent=e.target.value;apply('lw',+e.target.value*base,+e.target.value);};
+  q('.fs').oninput=e=>{q('.fsv').textContent=e.target.value;apply('fs',+e.target.value*base,+e.target.value);};
   q('.halo').onchange=e=>apply('halo',e.target.checked);
   q('.ok').onclick=()=>closeStyle();
   el.classList.remove('hidden');updateUI();}
