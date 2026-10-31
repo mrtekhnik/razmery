@@ -276,7 +276,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.30',APP_DATE='29.10.2026';
+const APP_VERSION='1.31',APP_DATE='29.10.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -419,7 +419,14 @@ function drawDim(c,d){
 const isDim=o=>!o.type||o.type==='dim';
 const MEAS=['diam','rad','angle'];
 const isMeas=o=>isDim(o)||MEAS.includes(o.type);
-function drawObj(c,o){if(isDim(o))return drawDim(c,o);if(o.type==='text')return drawLabel(c,o);if(MEAS.includes(o.type))return drawMeas(c,o);return drawShape(c,o);}
+function drawBlur(c,o,src){const x0=Math.min(o.x1,o.x2),y0=Math.min(o.y1,o.y2),w=Math.abs(o.x2-o.x1),h=Math.abs(o.y2-o.y1);if(w<1||h<1)return;
+  c.save();if(o.mode==='fill'||!src){c.fillStyle='#202428';c.fillRect(x0,y0,w,h);c.restore();return;}
+  const k=(src.naturalWidth||src.width)/proj_w(src),bs=Math.max(w,h)/14,sw=Math.max(1,Math.round(w/bs)),sh=Math.max(1,Math.round(h/bs));
+  const t=document.createElement('canvas');t.width=sw;t.height=sh;const tx=t.getContext('2d');tx.imageSmoothingQuality='high';
+  try{tx.drawImage(src,x0*k,y0*k,w*k,h*k,0,0,sw,sh);}catch(e){}
+  c.imageSmoothingEnabled=false;c.drawImage(t,x0,y0,w,h);c.restore();}
+let blurBaseW=0;const proj_w=src=>blurBaseW||(proj?proj.w:(src.naturalWidth||src.width));
+function drawObj(c,o,src){if(o.type==='blur')return drawBlur(c,o,src===undefined?img:src);if(isDim(o))return drawDim(c,o);if(o.type==='text')return drawLabel(c,o);if(MEAS.includes(o.type))return drawMeas(c,o);return drawShape(c,o);}
 function textAlong(o,mx,my,ux,uy,nx,ny,base){let th=Math.atan2(uy,ux);
   if(th>=Math.PI/2-1e-6)th-=Math.PI;else if(th<-Math.PI/2-1e-6)th+=Math.PI;
   const upx=Math.sin(th),upy=-Math.cos(th),side=1;
@@ -561,6 +568,7 @@ function objDist0(o,q){
     return m;}
   if(o.type==='text'){const L=labelLayout(o);let m=Math.hypot(Math.max(0,Math.abs(q.x-o.x)-L.w/2-L.pad),Math.max(0,Math.abs(q.y-o.y)-L.h/2-L.pad));if(L.shelf)m=Math.min(m,distSeg(q.x,q.y,L.shelf.x0,L.shelf.y,L.shelf.x1,L.shelf.y));
     if(L.lead)m=Math.min(m,distSeg(q.x,q.y,L.lead.x,L.lead.y,o.tip.x,o.tip.y));return m;}
+  if(o.type==='blur'){const x0=Math.min(o.x1,o.x2),x1=Math.max(o.x1,o.x2),y0=Math.min(o.y1,o.y2),y1=Math.max(o.y1,o.y2);return Math.hypot(Math.max(0,x0-q.x,q.x-x1),Math.max(0,y0-q.y,q.y-y1));}
   if(o.type==='pen'){let m=Infinity;const p=o.pts;for(let i=1;i<p.length;i++)m=Math.min(m,distSeg(q.x,q.y,p[i-1][0],p[i-1][1],p[i][0],p[i][1]));return m;}
   if(MEAS.includes(o.type))return measDist(o,q);
   if(o.type==='arrow')return distSeg(q.x,q.y,o.x1,o.y1,o.x2,o.y2);
@@ -577,7 +585,7 @@ function translateObj(o,dx,dy,part){
   o.x1+=dx;o.y1+=dy;o.x2+=dx;o.y2+=dy;if(typeof o.cx==='number'){o.cx+=dx;o.cy+=dy;}}
 async function makeThumb(im,p,ds){const k=Math.min(1,360/Math.max(p.w,p.h));const c=document.createElement('canvas');
   c.width=Math.max(1,Math.round(p.w*k));c.height=Math.max(1,Math.round(p.h*k));const x=c.getContext('2d');
-  x.imageSmoothingQuality='high';x.scale(k,k);x.drawImage(im,0,0,p.w,p.h);for(const d of ds)drawObj(x,d);
+  x.imageSmoothingQuality='high';x.scale(k,k);x.drawImage(im,0,0,p.w,p.h);blurBaseW=p.w;for(const d of ds)drawObj(x,d,im);blurBaseW=0;
   return await toBlob(c,'image/jpeg',0.8);}
 
 /* ---------- библиотеки PDF (загружаются по требованию, хранятся офлайн) ---------- */
@@ -648,12 +656,13 @@ function overlayCanvas(p,objs){const ow=p.xf?p.xf.ow:p.w,oh=p.xf?p.xf.oh:p.h,inv
   if(p.xf){const B=rotBox(p.xf.ow,p.xf.oh,p.xf.r);x.translate(ow/2,oh/2);x.rotate(-p.xf.r*Math.PI/180);x.translate(p.xf.c[0]*B.W-B.W/2,p.xf.c[1]*B.H-B.H/2);}
   for(const o of objs)drawObj(x,o);c.box={fx:x0/ow,fy:y0/oh,fw:bw/ow,fh:bh/oh};return c;}
 async function sheetsPdf(sheets,mode){
-  const out=[],files={};let lib=null,doc=null,fallback=0;
+  const out=[],files={};let lib=null,doc=null,fallback=0,blurred=0;
   if(mode==='over'){try{lib=await loadPdfLib();}catch(e){throw new Error(libErr);}doc=await lib.PDFDocument.create();}
   const rasterPages=[];
   for(let i=0;i<sheets.length;i++){const p=sheets[i];busy(true,`Лист ${i+1} из ${sheets.length}…`);
     let done=false;
-    if(mode==='over'&&p.src){let src=files[p.src.f];
+    const hasBlur=(p.dims||[]).some(o=>o.type==='blur');if(hasBlur&&mode==='over')blurred++;
+    if(mode==='over'&&p.src&&!hasBlur){let src=files[p.src.f];
       if(src===undefined){const f=await dbGet('files',p.src.f);try{src=f?await lib.PDFDocument.load(await f.blob.arrayBuffer(),{ignoreEncryption:true}):null;}catch(e){src=null;}files[p.src.f]=src;}
       if(src&&p.src.pg<src.getPageCount()){const [pg]=await doc.copyPages(src,[p.src.pg]);doc.addPage(pg);
         const oc=(p.dims||[]).length?overlayCanvas(p,p.dims):null;
@@ -672,8 +681,26 @@ async function sheetsPdf(sheets,mode){
         else rasterPages.push(pg);}
       finally{URL.revokeObjectURL(im.src);}}}
   busy(false);
-  if(mode==='over')return {blob:new Blob([await doc.save()],{type:'application/pdf'}),fallback};
+  if(mode==='over')return {blob:new Blob([await doc.save()],{type:'application/pdf'}),fallback,blurred};
   return {blob:buildPdf(rasterPages),fallback:0};}
+
+/* ---------- поиск лиц (MediaPipe Face Detection, офлайн) ---------- */
+let fdP=null;
+function loadFaceDetector(){if(!fdP)fdP=new Promise((res,rej)=>{const go=()=>{try{const fd=new window.FaceDetection({locateFile:f=>'./lib/fd/'+f});
+      fd.setOptions({model:'full',minDetectionConfidence:0.5});
+      Promise.resolve(fd.initialize?fd.initialize():null).then(()=>{fd.setOptions({model:'full',minDetectionConfidence:0.5});res(fd);},rej);}catch(e){rej(e);}};
+    if(window.FaceDetection)return go();const sc=document.createElement('script');sc.src='./lib/fd/face_detection.js';sc.onload=go;sc.onerror=()=>rej(new Error('lib'));document.head.appendChild(sc);})
+    .catch(e=>{fdP=null;throw e;});return fdP;}
+async function detectFaces(src,w,h){const fd=await loadFaceDetector();const k=Math.min(1,1600/Math.max(w,h));
+  const c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(h*k);c.getContext('2d').drawImage(src,0,0,c.width,c.height);
+  const r=await new Promise((res,rej)=>{fd.onResults(x=>res(x));fd.send({image:c}).catch(rej);});c.width=c.height=0;
+  return (r.detections||[]).map(d=>d.boundingBox).filter(Boolean).map(b=>({x:(b.xCenter-b.width/2)*w,y:(b.yCenter-b.height/2)*h,w:b.width*w,h:b.height*h}));}
+async function findFaces(){if(!proj)return;if(fullPromise){busy(true,'Подготовка…');await fullPromise;}
+  busy(true,'Поиск лиц…');let boxes;
+  try{boxes=await detectFaces(img,proj.w,proj.h);}catch(e){busy(false);alertBox('Поиск лиц',libErr.replace('модуль PDF','модуль поиска лиц'));return;}
+  busy(false);if(!boxes.length){toast('Лица не найдены. Обведите вручную инструментом «Скрыть»');return;}
+  pushHistory();const add=boxes.map(b=>{const m=0.18;return {...newBase(),type:'blur',x1:Math.max(0,b.x-b.w*m),y1:Math.max(0,b.y-b.h*m*1.6),x2:Math.min(proj.w,b.x+b.w*(1+m)),y2:Math.min(proj.h,b.y+b.h*(1+m))};});
+  dims.push(...add);selSet=new Set(add.map(o=>o.id));setMode('select');changed();toast(`Скрыто лиц: ${add.length}. Проверьте — лишнее удалите, пропущенное обведите вручную`);}
 
 /* ---------- подгонка изображения (поворот, кадрирование) ---------- */
 const xfKey=xf=>xf?JSON.stringify([xf.r,xf.c]):'';
@@ -948,7 +975,7 @@ function gridLayout(items,o){const n=items.length,cols=Math.min(gridCols(n,o),n)
   return {W,H,parts};}
 function renderStitch(items,o,scale=1){const L=stitchLayout(items,o),c=document.createElement('canvas');c.width=Math.max(1,Math.round(L.W*scale));c.height=Math.max(1,Math.round(L.H*scale));
   const x=c.getContext('2d');x.fillStyle=o.bg;x.fillRect(0,0,c.width,c.height);x.imageSmoothingQuality='high';x.scale(scale,scale);
-  items.forEach((it,j)=>{const P=L.parts[j];x.drawImage(it.im,P.x,P.y,P.w,P.h);if(o.marks&&it.dims)for(const d of it.dims)drawObj(x,xformObj(d,P.k,P.x,P.y));});
+  items.forEach((it,j)=>{const P=L.parts[j];x.drawImage(it.im,P.x,P.y,P.w,P.h);if(o.marks&&it.dims){x.save();x.translate(P.x,P.y);x.scale(P.k,P.k);blurBaseW=it.w;for(const d of it.dims)drawObj(x,d,it.im);blurBaseW=0;x.restore();};});
   return {c,L};}
 async function stitchDialog(items,fromProjects){
   const o={...settings.stitch,marks:fromProjects};let prevUrl=null,res=null;
@@ -1160,9 +1187,10 @@ $('#edAdj').onclick=async()=>{if(!proj)return;cancelAct();if(fullPromise){busy(t
   catch(e){busy(false);alertBox('Ошибка','Не удалось применить подгонку (не хватает памяти?).');}};
 function barClick(e){const b=e.target.closest('button');if(!b)return;
   if(b.dataset.k){dimKind=b.dataset.k;mpts=[];tmpP1=null;tmpP2=null;pendingDim=null;pendingObj=null;}
+  else if(b.dataset.t==='faces'){findFaces();return;}
   else if(b.dataset.t)tool=b.dataset.t;
   else if(b.dataset.l){labelMode=b.dataset.l;tmpTip=null;pendingObj=null;}
-  else{const k=b.dataset.b;if(k==='more'){moreMenu(b);return;}closeMore();if(k!=='st')closeStyle();if(k==='e'){editText();return;}if(k==='ls'){const o=selDim();if(o&&o.type==='text'&&o.tip){pushHistory();if(o.ls)delete o.ls;else o.ls=true;settings.labelShelf=!!o.ls;saveSettings();changed();}return;}if(k==='st'){quickStyle();return;}if(k==='c'){dupSel();return;}if(k==='s'){toggleShelf();return;}if(k==='g'){toggleRays();return;}if(k==='f'){flipSel();return;}if(k==='d'){delSel();return;}
+  else{const k=b.dataset.b;if(k==='more'){moreMenu(b);return;}closeMore();if(k!=='st')closeStyle();if(k==='e'){editText();return;}if(k==='bm'){const o=selDim();if(o&&o.type==='blur'){pushHistory();if(o.mode==='fill')delete o.mode;else o.mode='fill';changed();}return;}if(k==='ls'){const o=selDim();if(o&&o.type==='text'&&o.tip){pushHistory();if(o.ls)delete o.ls;else o.ls=true;settings.labelShelf=!!o.ls;saveSettings();changed();}return;}if(k==='st'){quickStyle();return;}if(k==='c'){dupSel();return;}if(k==='s'){toggleShelf();return;}if(k==='g'){toggleRays();return;}if(k==='f'){flipSel();return;}if(k==='d'){delSel();return;}
     if(k==='m')multi=!multi;else if(k==='a'){multi=true;dims.forEach(d=>selSet.add(d.id));}else if(k==='x'){selSet.clear();multi=false;moveMode=false;}else if(k==='mv')moveMode=!moveMode;}
   updateUI();render();}
 $('#ctxBar').addEventListener('click',barClick);$('#subBar').addEventListener('click',barClick);
@@ -1181,13 +1209,13 @@ function updateUI(){if(!proj)return;
   if(mode==='create'&&dimKind!=='lin')h={angle:['Коснитесь вершины угла','Коснитесь точки на первой стороне','Коснитесь точки на второй стороне'],diam:['Коснитесь края отверстия','Коснитесь противоположного края'],rad:['Коснитесь центра дуги','Коснитесь точки на дуге']}[dimKind][mpts.length];
   else if(mode==='create')h=tmpP2?'Коснитесь, где разместить размерную линию':tmpP1?'Коснитесь второй точки':'Коснитесь первой точки · уточняйте по лупе · 2 пальца — масштаб';
   else if(mode==='text')h=labelMode==='leader'?(tmpTip?'Коснитесь, где разместить текст':'Коснитесь точки, на которую указывает выноска'):'Коснитесь места для надписи';
-  else if(mode==='draw')h={pen:'Рисуйте пальцем',arrow:'Проведите от начала стрелки к острию',oval:'Протяните, чтобы обвести овалом',rect:'Протяните, чтобы обвести рамкой'}[tool]+' · 2 пальца — масштаб';
+  else if(mode==='draw')h={blur:'Обведите рамкой, что скрыть (номер, лицо, документ)',faces:'',pen:'Рисуйте пальцем',arrow:'Проведите от начала стрелки к острию',oval:'Протяните, чтобы обвести овалом',rect:'Протяните, чтобы обвести рамкой'}[tool]+' · 2 пальца — масштаб';
   else if(multi)h='Касайтесь объектов, чтобы добавить или убрать из выбора · перетаскивание — сдвиг выбранных';
   else if(one)h=(one.shelf&&isMeas(one)?'■ — полка · ':'')+(isDim(one)?'● — концы, ◆ — линия · ':one.type==='angle'?'● — вершина и стороны, ◆ — дуга · ':MEAS.includes(one.type)?'● — концы · ':(one.type==='text'&&one.tip?'● — острие выноски · ':(['arrow','oval','rect'].includes(one.type)?'● — углы · ':'')))+(isMeas(one)&&!moveMode?'сдвинуть целиком — «Ещё» → «Переместить»':'перетащите, чтобы сдвинуть')+(isMeas(one)||one.type==='text'?' · двойное касание — текст':'');
   else h='Коснитесь объекта, чтобы выбрать · 1 палец — сдвиг фото, 2 — масштаб';
   $('#hint').innerHTML='';$('#hint').append(h);{const x=document.createElement('span');x.className='hx';x.textContent='✕';x.title='Скрыть подсказки';$('#hint').append(x);}$('#hint').classList.toggle('hidden',!!settings.hintOff);$('#hintQ').classList.toggle('hidden',!settings.hintOff);$('#edTitle').textContent=proj.name;
   const sub=$('#subBar'),kinds=mode==='create'?[['lin','⟷','Линейный'],['angle','∠','Угол'],['diam','Ø','Диаметр'],['rad','R','Радиус']]
-    :mode==='draw'?[['pen','✎','Карандаш'],['arrow','↗','Стрелка'],['oval','◯','Овал'],['rect','▭','Рамка']]
+    :mode==='draw'?[['pen','✎','Карандаш'],['arrow','↗','Стрелка'],['oval','◯','Овал'],['rect','▭','Рамка'],['blur','▦','Скрыть'],['faces','☺','Лица']]
     :mode==='text'?[['plain','Т','Текст'],['leader','Т↙','С выноской']]:null;
   const attr=mode==='create'?'k':mode==='draw'?'t':'l',cur=mode==='create'?dimKind:mode==='draw'?tool:labelMode;
   if(kinds){sub.innerHTML=kinds.map(([k,sym,l])=>`<button data-${attr}="${k}" class="${cur===k?'on':''}"><b>${sym}</b><span>${l}</span></button>`).join('');sub.classList.remove('hidden');}
@@ -1199,6 +1227,7 @@ function updateUI(){if(!proj)return;
     if(one&&(isMeas(one)||one.type==='text'))a.push(ab('e','edit','Текст'));
     if(L.some(o=>isDim(o)||o.type==='angle'))a.push(ab('f','flip','Перевер.'));
     if(one&&one.type==='text'&&one.tip)a.push(ab('ls','shelf','Полка',one.ls?'on':''));
+    if(one&&one.type==='blur')a.push(ab('bm','all',one.mode==='fill'?'Заливка':'Пиксели'));
     if(one&&isMeas(one)&&one.text)a.push(ab('s','shelf',!one.shelf?'Полка':useLine(one)?'В линию':'Выноска',one.shelf?'on':''));
     a.push(ab('st','style','Стиль',styleOpen?'on':''),ab('d','trash','Удалить','dng'),ab('more','more','Ещё'));}
   else if(mode==='select'&&multi)a.push(ab('m','select','Неск.','on'),ab('a','select','Все'));
@@ -1639,7 +1668,7 @@ function pdfPage(P,IM,OBJ,o){const mm=o.dpi/25.4;let pw=o.paper==='a3'?297:210,p
   const note=o.note?(P.comment||'').trim():'';let lines=[],lh=5.2*mm;
   if(note){x.font=F(3.8);lines=wrapText(x,note,W-2*m);const maxL=Math.floor((H-y-m-60*mm)/lh);if(lines.length>maxL&&maxL>0){lines=lines.slice(0,maxL);lines[maxL-1]+=' …';}}
   const noteH=lines.length?lines.length*lh+5*mm:0,aw=W-2*m,ah=H-y-m-noteH,k=Math.min(aw/P.w,ah/P.h),iw=P.w*k,ih=P.h*k,ix=(W-iw)/2;
-  x.save();x.translate(ix,y);x.scale(k,k);x.imageSmoothingQuality='high';x.drawImage(IM,0,0,P.w,P.h);for(const d of OBJ)drawObj(x,d);x.restore();
+  x.save();x.translate(ix,y);x.scale(k,k);x.imageSmoothingQuality='high';x.drawImage(IM,0,0,P.w,P.h);blurBaseW=P.w;for(const d of OBJ)drawObj(x,d,IM);blurBaseW=0;x.restore();
   x.strokeStyle='#c9ced6';x.lineWidth=Math.max(1,0.25*mm);x.strokeRect(ix,y,iw,ih);
   if(lines.length){x.font=F(3.8);x.fillStyle='#1b2430';let ty=y+ih+5*mm;for(const ln of lines){x.fillText(ln,m,ty);ty+=lh;}}
   return {c,wpt:pw*72/25.4,hpt:ph*72/25.4};}
@@ -1672,7 +1701,7 @@ async function renderExport(fmt,withNote,P=proj,IM=img,OBJ=dims,maxSide=0){
   const c=document.createElement('canvas');c.width=w;c.height=h+(band?band.h:0);const x=c.getContext('2d');
   x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
   x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.setTransform(w/P.w,0,0,h/P.h,0,0);
-  x.drawImage(IM,0,0,P.w,P.h);for(const o of OBJ)drawObj(x,o);
+  x.drawImage(IM,0,0,P.w,P.h);blurBaseW=P.w;for(const o of OBJ)drawObj(x,o,IM);blurBaseW=0;
   if(band){x.setTransform(1,0,0,1,0,0);x.fillStyle='#d9dee5';x.fillRect(0,h,w,Math.max(1,Math.round(band.fsN/10)));
     x.fillStyle='#1b2430';x.font=NF(band.fsN);x.textBaseline='top';x.textAlign='left';
     band.lines.forEach((ln,i)=>x.fillText(ln,band.pad,h+band.pad+i*band.lh));}
@@ -1689,11 +1718,11 @@ async function openExport(){
   const build=async()=>{const k=key();if(cache&&cache.k===k)return cache.blob;let blob,extra='';
     busy(true,'Подготовка файла…');
     try{if(fmt==='pdf'&&pmode()!=='page'){const list=allSheets()?(await Promise.all(sheetIds.map(id=>dbGet('projects',id)))).filter(Boolean):[{...proj,dims:clone(dims)}];
-        const r=await sheetsPdf(list,pmode());blob=r.blob;if(r.fallback)extra=` ${r.fallback} — картинкой: нет исходного PDF на этом устройстве.`;}
+        const r=await sheetsPdf(list,pmode());blob=r.blob;if(r.fallback)extra=` ${r.fallback} — картинкой: нет исходного PDF на этом устройстве.`;if(r.blurred)extra+=` Листы со скрытием (${r.blurred}) сохранены картинкой, чтобы скрытое нельзя было достать из PDF.`;}
       else if(fmt==='pdf'){blob=buildPdf([await pageJpeg(pdfPage(proj,img,dims,{...settings.pdf,note:withNote}))]);}
       else blob=(await renderExport(fmt,withNote,proj,img,dims,settings.expSize||0)).blob;}
     finally{busy(false);}
-    cache={k,blob};if(extra)toast(extra.trim());return blob;};
+    cache={k,blob,extra:extra.trim()};return blob;};
   await modal((box,close)=>{
     box.innerHTML=`<h3>Экспорт</h3><p class="note">Создаётся отдельная копия с размерами. Исходное фото в проекте не меняется.</p>
     <div class="seg"><button data-f="jpg">JPG</button><button data-f="png">PNG</button><button data-f="pdf">PDF</button></div><div class="szw">${SIZE_SEG}</div>${srcP?SRC_SEG:''}${PDF_SEG}${hasNote?'<label class="chk"><input type="checkbox" class="wn"> Комментарий полосой под фото</label>':''}<p class="note info"></p>
@@ -1714,7 +1743,7 @@ async function openExport(){
     if(q('.all')){q('.all').checked=settings.pdf.all!==false;q('.all').onchange=e=>{settings.pdf={...settings.pdf,all:e.target.checked};saveSettings();prep();};}
     if(q('.wn')){q('.wn').checked=withNote;q('.wn').onchange=e=>{withNote=e.target.checked;prep();};}
     const fail=e=>alertBox('Не удалось создать файл',e&&e.message===libErr?libErr:'Возможно, не хватает памяти. Попробуйте меньший размер или качество.');
-    q('.sv').onclick=async()=>{try{const b=await build();download(b,fname());toast(`Файл сохранён (${(b.size/1048576).toFixed(1)} МБ)`);}catch(e){fail(e);}};
+    q('.sv').onclick=async()=>{try{const b=await build();download(b,fname());if(cache&&cache.extra)alertBox('Файл сохранён',cache.extra);else toast(`Файл сохранён (${(b.size/1048576).toFixed(1)} МБ)`);}catch(e){fail(e);}};
     if(q('.sh'))q('.sh').onclick=async()=>{let b;try{b=await build();}catch(e){fail(e);return;}
       try{await navigator.share({files:[new File([b],fname(),{type:b.type})],title:proj.name});}
       catch(e){if(e.name==='NotAllowedError')toast('Файл готов — нажмите «Поделиться» ещё раз');else if(e.name!=='AbortError')toast('Не удалось поделиться');}};
@@ -1748,7 +1777,7 @@ function backupReady(blob,name,n,full=true){const sf=shareableBackup(blob,name);
   q('.sv').onclick=()=>{download(blob,name);if(full)markExport();toast('Копия сохранена в «Загрузки»');};
   q('.cl').onclick=()=>close(null);});}
 const isNum=v=>typeof v==='number'&&Number.isFinite(v);
-const OBJ_TYPES=['dim','text','pen','arrow','oval','rect','diam','rad','angle'];
+const OBJ_TYPES=['dim','text','pen','arrow','oval','rect','diam','rad','angle','blur'];
 function validObj(d){if(!d||typeof d.id!=='string')return false;if(d.shelf!=null&&!(isNum(d.shelf.x)&&isNum(d.shelf.y)))return false;const t=d.type||'dim';if(!OBJ_TYPES.includes(t))return false;
   if(!isNum(d.lw)||!isNum(d.fs)||d.lw<=0||d.fs<=0)return false;
   if(t==='dim')return ['x1','y1','x2','y2','off'].every(k=>isNum(d[k]))&&typeof d.text==='string';
@@ -1778,7 +1807,7 @@ function cleanObj0(d){const t=d.type||'dim',b={id:d.id,color:/^#[0-9a-f]{6}$/i.t
   if(t==='diam'||t==='rad')return {...b,type:t,x1:d.x1,y1:d.y1,x2:d.x2,y2:d.y2,text:d.text,ts:d.ts===-1?-1:1};
   if(t==='angle')return {...b,type:'angle',cx:d.cx,cy:d.cy,x1:d.x1,y1:d.y1,x2:d.x2,y2:d.y2,r:d.r,rev:!!d.rev,text:d.text};
   if(t==='pen')return {...b,type:'pen',pts:d.pts.map(p=>[p[0],p[1]])};
-  return {...b,type:t,x1:d.x1,y1:d.y1,x2:d.x2,y2:d.y2};}
+  return {...b,type:t,x1:d.x1,y1:d.y1,x2:d.x2,y2:d.y2,...(t==='blur'&&d.mode==='fill'?{mode:'fill'}:{})};}
 $('#fBackup').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)importBackup(f);};
 async function importBackup(file){
   busy(true,'Проверка файла…');let data;
