@@ -96,6 +96,8 @@ header.top h1{font-size:18px;margin:0 6px;flex:1;white-space:nowrap;overflow:hid
 .tabs button.on{background:var(--accent);color:#fff}
 .recent{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .recent .chip{background:#e7eef9;border-color:#c9d8f0}
+#dropOv{position:fixed;inset:0;z-index:300;background:rgba(31,111,235,.18);border:3px dashed var(--accent);display:flex;align-items:center;justify-content:center;pointer-events:none}
+#dropOv div{background:#fff;color:#1f2933;padding:14px 20px;border-radius:12px;font-size:17px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.2)}
 .srch{margin:0 12px 10px;position:relative}
 .srch input{width:100%;height:42px;border:1px solid var(--line);border-radius:10px;padding:0 36px 0 12px;font:inherit;font-size:15px;background:var(--card);outline:none}
 .srch input:focus{border-color:var(--accent)}
@@ -203,6 +205,7 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
 #stylePanel .v{width:30px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums}
 #stylePanel .chk{margin:0;font-size:13px;gap:6px;flex:1}
 #stylePanel .chk input{width:20px;height:20px}
+#stylePanel .pk,#stylePanel .rs{height:34px;padding:0 12px;border-radius:8px;background:rgba(255,255,255,.1);color:#e9eef5}
 #stylePanel .ok{height:38px;padding:0 18px;border-radius:8px;background:var(--accent);color:#fff;font-weight:600}
 #busy{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center}
 #busy span{background:#fff;padding:14px 22px;border-radius:12px}
@@ -220,7 +223,7 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
     <button class="big alt" id="btnStitch" data-ic="stitch" style="flex:0 0 54px" aria-label="Склеить фото" title="Склеить фото"></button>
   </div>
   <div class="chipsRow" id="lsChips"></div>
-  <div class="srch" id="srch"><input type="search" id="srchIn" placeholder="Поиск по названию и комментарию" autocomplete="off"><button id="srchX" class="hidden" aria-label="Очистить">✕</button></div>
+  <div class="srch" id="srch"><input type="search" id="srchIn" placeholder="Поиск: название, размеры, надписи, комментарий" autocomplete="off"><button id="srchX" class="hidden" aria-label="Очистить">✕</button></div>
   <div id="bkLine" class="hidden"><span></span><button id="bkNow">Создать</button></div>
   <div id="projList"></div>
   <div id="emptyMsg" class="empty hidden"></div>
@@ -261,6 +264,7 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
   </nav>
 </div>
 
+<div id="dropOv" class="hidden"><div>Отпустите, чтобы добавить фото или PDF</div></div>
 <input type="file" id="fGallery" accept="image/*" hidden>
 <input type="file" id="fPdf" accept="application/pdf,.pdf" hidden>
 <input type="file" id="fStitch" accept="image/*" multiple hidden>
@@ -279,7 +283,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.36',APP_DATE='31.10.2026';
+const APP_VERSION='1.37',APP_DATE='04.11.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -425,8 +429,11 @@ const isMeas=o=>isDim(o)||MEAS.includes(o.type);
 /* поворот рамки, овала и скрытия: o.rot (градусы) вокруг центра прямоугольника x1,y1–x2,y2 */
 const ROTT=['rect','oval','blur'];
 const rotOf=o=>ROTT.includes(o.type)&&o.rot?o.rot:0;
+const textRot=o=>o.type==='text'&&!o.tip&&o.rot?o.rot:0;
 const boxC=o=>({x:(o.x1+o.x2)/2,y:(o.y1+o.y2)/2});
 function rotPt(x,y,c,deg){const t=deg*Math.PI/180,co=Math.cos(t),si=Math.sin(t),dx=x-c.x,dy=y-c.y;return {x:c.x+dx*co-dy*si,y:c.y+dx*si+dy*co};}
+function textPoly(o){const L=labelLayout(o),c={x:o.x,y:o.y},hw=L.w/2+L.pad,hh=L.h/2+L.pad;
+  return [[o.x-hw,o.y-hh],[o.x+hw,o.y-hh],[o.x+hw,o.y+hh],[o.x-hw,o.y+hh]].map(([x,y])=>rotPt(x,y,c,textRot(o)));}
 function rotCorners(o){const c=boxC(o),r=rotOf(o);return [[o.x1,o.y1],[o.x2,o.y1],[o.x2,o.y2],[o.x1,o.y2]].map(([x,y])=>rotPt(x,y,c,r));}
 function normDeg(a){a=((a%360)+360)%360;return a>180?a-360:a;}
 const blurCache=new Map();
@@ -534,7 +541,10 @@ function measBounds(o){const P=measOf(o),xs=[],ys=[];if(!P)return {x0:o.x1,y0:o.
   return {x0:Math.min(...xs),y0:Math.min(...ys),x1:Math.max(...xs),y1:Math.max(...ys)};}
 function arrowTri(tx,ty,fx,fy,al,aw){const L=Math.hypot(tx-fx,ty-fy)||1,ux=(tx-fx)/L,uy=(ty-fy)/L,bx=tx-ux*al,by=ty-uy*al;return [tx,ty,bx-uy*aw,by+ux*aw,bx+uy*aw,by-ux*aw];}
 function labelLayout(o){mctx.font=FONT(o.fs);const lines=(o.text||' ').split('\n'),lh=o.fs*1.22;
-  const w=Math.max(o.fs*0.6,...lines.map(l=>mctx.measureText(l).width)),h=lh*lines.length,pad=o.fs*0.3;let lead=null;
+  let w=Math.max(o.fs*0.6,...lines.map(l=>mctx.measureText(l).width)),h=lh*lines.length,pad=o.fs*0.3;let lead=null;
+  if(o.pos&&o.circ){const r=Math.max(w,lh*0.8)/2+pad*1.3;w=h=2*r-2*pad;
+    if(o.tip){const dx=o.tip.x-o.x,dy=o.tip.y-o.y,d=Math.hypot(dx,dy);if(d>r)lead={x:o.x+dx/d*r,y:o.y+dy/d*r};}
+    return {lines,lh,w,h,pad,lead,circ:r};}
   if(o.tip&&o.ls){const sy=o.y+h/2+pad*0.4,x0=o.x-w/2-pad,x1=o.x+w/2+pad,end=o.tip.x<=o.x?x0:x1;
     return {lines,lh,w,h,pad,lead:{x:end,y:sy},shelf:{x0,x1,y:sy}};}
   if(o.tip){const dx=o.tip.x-o.x,dy=o.tip.y-o.y,hw=w/2+pad,hh=h/2+pad;
@@ -542,12 +552,14 @@ function labelLayout(o){mctx.font=FONT(o.fs);const lines=(o.text||' ').split('\n
   return {lines,lh,w,h,pad,lead};}
 function drawLabel(c,o){const L=labelLayout(o),halo=o.halo!==false,hc=haloColor(o.color),hw=Math.max(o.lw*1.6,o.fs*0.08);
   c.save();c.lineJoin='round';c.lineCap='round';
-  if(L.lead){const tri=arrowTri(o.tip.x,o.tip.y,L.lead.x,L.lead.y,o.fs*0.6,o.fs*0.2);
+  if(L.circ){const cp=()=>{c.beginPath();c.arc(o.x,o.y,L.circ,0,Math.PI*2);};if(halo){c.strokeStyle=hc;c.lineWidth=o.lw+hw;cp();c.stroke();}c.strokeStyle=o.color;c.lineWidth=o.lw;cp();c.stroke();}
+  if(L.lead){const tri=arrowTri(o.tip.x,o.tip.y,L.lead.x,L.lead.y,o.fs*0.6,o.fs*0.2),dr=Math.max(o.lw*1.8,o.fs*0.13);
     const lp=()=>{c.beginPath();if(L.shelf){c.moveTo(L.shelf.x0,L.shelf.y);c.lineTo(L.shelf.x1,L.shelf.y);}c.moveTo(L.lead.x,L.lead.y);c.lineTo(o.tip.x,o.tip.y);};
-    const tp=()=>{c.beginPath();c.moveTo(tri[0],tri[1]);c.lineTo(tri[2],tri[3]);c.lineTo(tri[4],tri[5]);c.closePath();};
+    const tp=o.pos?()=>{c.beginPath();c.arc(o.tip.x,o.tip.y,dr,0,Math.PI*2);}:()=>{c.beginPath();c.moveTo(tri[0],tri[1]);c.lineTo(tri[2],tri[3]);c.lineTo(tri[4],tri[5]);c.closePath();};
     if(halo){c.strokeStyle=hc;c.lineWidth=o.lw+hw;lp();c.stroke();c.lineWidth=hw;tp();c.stroke();}
     c.strokeStyle=o.color;c.fillStyle=o.color;c.lineWidth=o.lw;lp();c.stroke();tp();c.fill();}
-  c.font=FONT(o.fs);c.textAlign='center';c.textBaseline='middle';const y0=o.y-L.h/2;
+  const tr=textRot(o);if(tr){c.translate(o.x,o.y);c.rotate(tr*Math.PI/180);c.translate(-o.x,-o.y);}
+  c.font=FONT(o.fs);c.textAlign='center';c.textBaseline='middle';const y0=o.y-L.lh*L.lines.length/2;
   L.lines.forEach((ln,i)=>{const y=y0+L.lh*(i+0.5);if(halo){c.lineWidth=o.fs*0.18;c.strokeStyle=hc;c.strokeText(ln,o.x,y);}c.fillStyle=o.color;c.fillText(ln,o.x,y);});
   c.restore();}
 const arrowHead=o=>[Math.max(o.lw*4,o.fs*0.6),Math.max(o.lw*1.6,o.fs*0.22)];
@@ -573,6 +585,7 @@ function objBounds(o){const b=objBounds0(o);if(!(o.shelf&&isMeas(o)&&o.text))ret
 function objBounds0(o){
   if(MEAS.includes(o.type))return measBounds(o);
   if(o.type==='text'){const L=labelLayout(o);let b={x0:o.x-L.w/2-L.pad,y0:o.y-L.h/2-L.pad,x1:o.x+L.w/2+L.pad,y1:o.y+L.h/2+L.pad};
+    if(textRot(o)){const P=textPoly(o);return {x0:Math.min(...P.map(q=>q.x)),y0:Math.min(...P.map(q=>q.y)),x1:Math.max(...P.map(q=>q.x)),y1:Math.max(...P.map(q=>q.y))};}
     if(o.tip)b={x0:Math.min(b.x0,o.tip.x),y0:Math.min(b.y0,o.tip.y),x1:Math.max(b.x1,o.tip.x),y1:Math.max(b.y1,o.tip.y)};return b;}
   const xs=[],ys=[];if(o.type==='pen')o.pts.forEach(p=>{xs.push(p[0]);ys.push(p[1]);});
   else if(rotOf(o)){const c=boxC(o);if(o.type==='oval'){const t=rotOf(o)*Math.PI/180,rx=Math.abs(o.x2-o.x1)/2,ry=Math.abs(o.y2-o.y1)/2,
@@ -589,7 +602,7 @@ function objDist0(o,q){
     if(P.tl){const t=P.tl,dx=q.x-t.cx,dy=q.y-t.cy,c=Math.cos(-t.th),s=Math.sin(-t.th);const lx=dx*c-dy*s,ly=dx*s+dy*c;
       m=Math.min(m,Math.hypot(Math.max(0,Math.abs(lx)-t.w/2),Math.max(0,Math.abs(ly)-t.h/2)));}
     return m;}
-  if(o.type==='text'){const L=labelLayout(o);let m=Math.hypot(Math.max(0,Math.abs(q.x-o.x)-L.w/2-L.pad),Math.max(0,Math.abs(q.y-o.y)-L.h/2-L.pad));if(L.shelf)m=Math.min(m,distSeg(q.x,q.y,L.shelf.x0,L.shelf.y,L.shelf.x1,L.shelf.y));
+  if(o.type==='text'){const L=labelLayout(o);if(textRot(o))q=rotPt(q.x,q.y,{x:o.x,y:o.y},-textRot(o));let m=Math.hypot(Math.max(0,Math.abs(q.x-o.x)-L.w/2-L.pad),Math.max(0,Math.abs(q.y-o.y)-L.h/2-L.pad));if(L.shelf)m=Math.min(m,distSeg(q.x,q.y,L.shelf.x0,L.shelf.y,L.shelf.x1,L.shelf.y));
     if(L.lead)m=Math.min(m,distSeg(q.x,q.y,L.lead.x,L.lead.y,o.tip.x,o.tip.y));return m;}
   if(o.type==='blur'){const x0=Math.min(o.x1,o.x2),x1=Math.max(o.x1,o.x2),y0=Math.min(o.y1,o.y2),y1=Math.max(o.y1,o.y2);return Math.hypot(Math.max(0,x0-q.x,q.x-x1),Math.max(0,y0-q.y,q.y-y1));}
   if(o.type==='pen'){let m=Infinity;const p=o.pts;for(let i=1;i<p.length;i++)m=Math.min(m,distSeg(q.x,q.y,p[i-1][0],p[i-1][1],p[i][0],p[i][1]));return m;}
@@ -600,7 +613,7 @@ function objDist0(o,q){
   if(o.type==='oval'){const cx=(x0+x1)/2,cy=(y0+y1)/2,rx=(x1-x0)/2,ry=(y1-y0)/2;if(rx<1||ry<1)return distSeg(q.x,q.y,x0,y0,x1,y1);
     return Math.abs(Math.hypot((q.x-cx)/rx,(q.y-cy)/ry)-1)*Math.min(rx,ry);}
   return Infinity;}
-function inLabel(o,q){const L=labelLayout(o);return Math.abs(q.x-o.x)<=L.w/2+L.pad&&Math.abs(q.y-o.y)<=L.h/2+L.pad;}
+function inLabel(o,q){const L=labelLayout(o);if(textRot(o))q=rotPt(q.x,q.y,{x:o.x,y:o.y},-textRot(o));return Math.abs(q.x-o.x)<=L.w/2+L.pad&&Math.abs(q.y-o.y)<=L.h/2+L.pad;}
 function translateObj(o,dx,dy,part){
   if(o.shelf)o.shelf={x:o.shelf.x+dx,y:o.shelf.y+dy};
   if(o.type==='text'){o.x+=dx;o.y+=dy;if(o.tip&&part!=='text')o.tip={x:o.tip.x+dx,y:o.tip.y+dy};return;}
@@ -797,7 +810,7 @@ function mapObj(o,f){const c=clone(o),P=(x,y)=>f(x,y);
     c.x1=M[0]-hw;c.y1=M[1]-hh;c.x2=M[0]+hw;c.y2=M[1]+hh;if(r)c.rot=+r.toFixed(4);else delete c.rot;return c;}
   if(typeof c.x1==='number'){[c.x1,c.y1]=P(o.x1,o.y1);[c.x2,c.y2]=P(o.x2,o.y2);}
   if(typeof c.cx==='number')[c.cx,c.cy]=P(o.cx,o.cy);
-  if(o.type==='text'){[c.x,c.y]=P(o.x,o.y);if(o.tip){const t=P(o.tip.x,o.tip.y);c.tip={x:t[0],y:t[1]};}}
+  if(o.type==='text'){[c.x,c.y]=P(o.x,o.y);if(textRot(o)){const E=P(o.x+1,o.y),th=Math.atan2(E[1]-c.y,E[0]-c.x)*180/Math.PI;const r=normDeg(o.rot+th);if(Math.abs(r)<1e-6)delete c.rot;else c.rot=+r.toFixed(4);}if(o.tip){const t=P(o.tip.x,o.tip.y);c.tip={x:t[0],y:t[1]};}}
   if(o.pts)c.pts=o.pts.map(q=>P(q[0],q[1]));
   if(o.shelf){const t=P(o.shelf.x,o.shelf.y);c.shelf={x:t[0],y:t[1]};}
   return c;}
@@ -884,6 +897,11 @@ $('#bkNow').onclick=()=>exportBackup();
 let thumbUrls=[];
 function sortFn(){const nm=(a,b)=>a.name.localeCompare(b.name,'ru',{numeric:true});
   return {name:nm,nameDesc:(a,b)=>-nm(a,b),dateAsc:(a,b)=>a.modified-b.modified}[settings.sort]||((a,b)=>b.modified-a.modified);}
+// поиск: без учёта регистра, пробелов, ⌀/Ø/ø и запятой/точки — «Ø32» найдёт «ø 32», «12,5» — «12.5»
+const nrm=t=>(t||'').toLowerCase().replace(/[⌀Ø]/g,'ø').replace(/,/g,'.').replace(/\s+/g,'');
+function searchHit(p,q){if(nrm(p.name).includes(q))return 'name';
+  const o=(p.dims||[]).find(o=>nrm(o.text).includes(q));if(o)return {k:o.pos?'позиция':isMeas(o)?'размер':'надпись',t:o.text};
+  if(nrm(p.comment).includes(q))return {k:'комментарий',t:p.comment};return null;}
 let searchQ='',folders=[],curFolder=null,trashView=false,navStack=[],selMode=false,selProj=new Set(),lastPs=[];
 const TRASH_DAYS=30;
 async function loadFolders(){try{const r=await dbGet('meta','folders');folders=(r&&Array.isArray(r.value))?r.value:[];}catch(e){folders=[];}}
@@ -934,9 +952,9 @@ async function renderList(){
     const b=$('#lsSync');b.classList.toggle('has',dirty);b.title=dirty?'Есть несинхронизированные изменения':'Синхронизировать';}
   const cols=settings.gridCols||2;list.className='g'+cols;list.innerHTML='';let items;
   if(trashView)items=inTrash.sort((a,b)=>b.deleted-a.deleted);
-  else if(searchQ&&!selMode){const q=searchQ.toLowerCase();
-    items=live.filter(p=>(p.name||'').toLowerCase().includes(q)||(p.comment||'').toLowerCase().includes(q)||(p.dims||[]).some(o=>(o.text||'').toLowerCase().includes(q)));
-    folders.filter(f=>f.name.toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name,'ru')).forEach(f=>list.appendChild(folderCard(f,live)));}
+  else if(searchQ&&!selMode){const q=nrm(searchQ);
+    items=live.filter(p=>{p._hit=searchHit(p,q);return !!p._hit;});
+    folders.filter(f=>nrm(f.name).includes(q)).sort((a,b)=>a.name.localeCompare(b.name,'ru')).forEach(f=>list.appendChild(folderCard(f,live)));}
   else{items=live.filter(p=>(p.folderId||null)===curFolder);
     folders.filter(f=>(f.parent||null)===curFolder).sort((a,b)=>a.name.localeCompare(b.name,'ru')).forEach(f=>list.appendChild(folderCard(f,live)));}
   if(!trashView)items.sort(sortFn());
@@ -971,7 +989,8 @@ function projCard(p){const G=p._g,ids=G?G.sheets.map(x=>x.id):[p.id],isSel=()=>i
   if(trashView){const left=Math.max(0,TRASH_DAYS-Math.floor((Date.now()-p.deleted)/864e5));
     line('Удалён: '+fmtDate(p.deleted));line(`Удалится через ${left} ${plural(left,'день','дня','дней')}`);
     const f=fById(p.folderId);if(p.folderId)line(f?'Папка: '+f.name:'Папка удалена — восстановится в «Все проекты»');}
-  else{if(searchQ&&p.folderId){const ch=fChain(p.folderId);if(ch.length)line('📁 '+ch.map(f=>f.name).join(' › '),'path');}
+  else{if(searchQ&&p._hit&&p._hit!=='name'){const t=p._hit.t.replace(/\s+/g,' ');line(`🔎 ${p._hit.k}: ${t.length>40?t.slice(0,40)+'…':t}`,'path');}
+    if(searchQ&&p.folderId){const ch=fChain(p.folderId);if(ch.length)line('📁 '+ch.map(f=>f.name).join(' › '),'path');}
     if(G)line(`📄 Листов: ${G.sheets.length}`,'path');else if(p.src)line('📄 Из PDF','path');
     line('Создан: '+fmtDate(p.created));line('Изменён: '+fmtDate(p.modified));
     const allD=G?G.sheets.flatMap(x=>x.dims||[]):(p.dims||[]),nd=allD.filter(o=>!o.type||['dim','diam','rad','angle'].includes(o.type)).length,no=allD.length-nd;
@@ -1160,14 +1179,15 @@ async function massExport(){const L=selRecs();if(!L.length)return;
 $('#btnGallery').onclick=()=>$('#fGallery').click();
 $('#btnCamera').onclick=()=>$('#fCamera').click();
 for(const id of ['#fGallery','#fCamera'])$(id).onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)newProject(f);};
-async function newProject(file){
+async function newProject(file,opt={}){
   busy(true,'Загрузка фото…');
   let sm=null;
   try{const blob=file.slice(0,file.size,file.type||'image/jpeg');const {w,h}=await imgSize(blob);if(!w||!h)throw new Error('size');
     sm=await smallImage(blob,w,h);
-    const now=Date.now(),id=uid();const p={id,name:'Фото '+fmtDate(now),created:now,modified:now,w,h,dims:[],folderId:curFolder};
+    const now=Date.now(),id=uid();const p={id,name:opt.name||('Фото '+fmtDate(now)),created:now,modified:now,w,h,dims:[],folderId:curFolder};
     busy(false);let xf=null;
-    if(settings.adjustOnLoad!==false){const r=await adjustImage(sm,w,h,{title:'Новый проект',ok:'Создать',name:settings.askName!==false?p.name:undefined});
+    if(opt.quiet){}
+    else if(settings.adjustOnLoad!==false){const r=await adjustImage(sm,w,h,{title:'Новый проект',ok:'Создать',name:settings.askName!==false?p.name:undefined});
       if(!r){freeSm(sm);return;}xf=r.xf;if(r.name)p.name=r.name;}
     else if(settings.askName!==false){const v=await askText('Название проекта',p.name,{placeholder:'Например: Кронштейн, заказ 125'});if(v===null){freeSm(sm);return;}if(v)p.name=v;}
     busy(true,'Сохранение…');let base=sm,work=null,full=null;
@@ -1176,8 +1196,86 @@ async function newProject(file){
     if(base!==sm)URL.revokeObjectURL(base.src);freeSm(sm);sm=null;
     const ph={id,blob,preview,previewKey:xfKey(xf)};if(work){ph.work=work;ph.workKey=xfKey(xf);}
     await dbPutMany([['projects',p],['photos',ph]]);busy(false);
-    openEditor(id);
-  }catch(e){busy(false);if(sm)freeSm(sm);alertBox('Не удалось открыть изображение','Формат не поддерживается браузером или файл повреждён. Попробуйте JPG или PNG.');}}
+    if(opt.quiet)return true;openEditor(id);
+  }catch(e){busy(false);if(sm)freeSm(sm);if(opt.quiet)return false;alertBox('Не удалось открыть изображение','Формат не поддерживается браузером или файл повреждён. Попробуйте JPG или PNG.');}}
+
+/* ---------- файлы снаружи: вставка из буфера и перетаскивание (ПК) ---------- */
+const isImg=f=>/^image\//.test(f.type||'')||/\.(jpe?g|png|webp|gif|bmp|heic)$/i.test(f.name||'');
+const isPdf=f=>f.type==='application/pdf'||/\.pdf$/i.test(f.name||'');
+async function leaveEditor(){if(!proj)return true;history.back();for(let i=0;i<60&&proj;i++)await new Promise(r=>setTimeout(r,50));return !proj;}
+async function addOutside(files,how){
+  const ims=files.filter(isImg),pdfs=files.filter(isPdf);if(!ims.length&&!pdfs.length){toast('Поддерживаются фото и PDF');return;}
+  if(proj){const what=ims.length+pdfs.length>1?`файлов: ${ims.length+pdfs.length}`:(pdfs.length?'PDF':'изображения');
+    if(!await confirmBox('Новый проект',`Создать новый проект из ${how==='paste'?'картинки из буфера обмена':what}? Текущий проект сохранён.`,'Создать'))return;
+    if(!await leaveEditor())return;}
+  if(ims.length===1&&!pdfs.length){const nm=how==='paste'?'Скриншот '+fmtDate(Date.now()):undefined;return newProject(ims[0],{name:nm});}
+  if(!ims.length){if(pdfs.length>1)toast('PDF открываются по одному — открыт первый');return importPdf(pdfs[0]);}
+  let ok=0;for(let i=0;i<ims.length;i++){busy(true,`Добавление фото ${i+1} из ${ims.length}…`);
+    if(await newProject(ims[i],{quiet:true,name:(ims[i].name||'').replace(/\.[^.]+$/,'')||undefined}))ok++;}
+  busy(false);await renderList();toast(`Добавлено фото: ${ok}`+(ok<ims.length?` · не открылось: ${ims.length-ok}`:''));
+  if(pdfs.length){toast('PDF открываются по одному');importPdf(pdfs[0]);}}
+const typing=t=>t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable);
+document.addEventListener('paste',e=>{if(modalClose||typing(e.target))return;
+  const files=[...((e.clipboardData&&e.clipboardData.files)||[])].filter(f=>isImg(f)||isPdf(f));
+  if(files.length){e.preventDefault();addOutside(files,'paste');return;}
+  if(proj&&clipGet()){e.preventDefault();pasteClip();}});
+{let depth=0;const ov=()=>$('#dropOv'),hasFiles=e=>e.dataTransfer&&[...e.dataTransfer.types].includes('Files');
+  window.addEventListener('dragenter',e=>{if(!hasFiles(e))return;e.preventDefault();depth++;if(!modalClose)ov().classList.remove('hidden');});
+  window.addEventListener('dragover',e=>{if(!hasFiles(e))return;e.preventDefault();e.dataTransfer.dropEffect=modalClose?'none':'copy';});
+  window.addEventListener('dragleave',e=>{if(!hasFiles(e))return;depth=Math.max(0,depth-1);if(!depth)ov().classList.add('hidden');});
+  window.addEventListener('drop',e=>{if(!hasFiles(e))return;e.preventDefault();depth=0;ov().classList.add('hidden');if(modalClose)return;addOutside([...e.dataTransfer.files],'drop');});}
+
+/* ---------- буфер разметки: копировать на одном фото, вставить на другом ---------- */
+const CLIP_KEY='razmery.clip';let clipPasted='';
+function clipGet(){try{const c=JSON.parse(localStorage.getItem(CLIP_KEY)||'null');return c&&Array.isArray(c.objs)&&c.objs.length?c:null;}catch(e){return null;}}
+function copySel(cut){const L=selList();if(!L.length||!proj)return;
+  try{localStorage.setItem(CLIP_KEY,JSON.stringify({from:proj.id,w:proj.w,h:proj.h,t:Date.now(),objs:clone(L)}));}catch(e){toast('Не удалось скопировать');return;}
+  clipPasted='';if(cut){pushHistory();dims=dims.filter(x=>!selSet.has(x.id));selSet.clear();multi=false;changed();toast(`Вырезано: ${L.length} — вставьте на этом или другом фото`);}
+  else toast(`В буфере: ${L.length} — откройте другое фото и нажмите «Вставить» (Ctrl+V)`);}
+function scaleSizes(o,s){o.lw*=s;o.fs*=s;if(isNum(o.off))o.off*=s;if(o.type==='angle'&&isNum(o.r))o.r*=s;}
+function pasteClip(){const c=clipGet();if(!c||!proj)return;const objs=c.objs.filter(validObj).map(cleanObj);if(!objs.length)return;
+  let out;
+  if(c.from===proj.id&&c.w===proj.w&&c.h===proj.h)out=objs.map(o=>{const n=clone(o);n.id=uid();const k=o.fs*1.5;translateObj(n,k,k);return n;});
+  else{let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;objs.forEach(o=>{const b=objBounds(o);x0=Math.min(x0,b.x0);y0=Math.min(y0,b.y0);x1=Math.max(x1,b.x1);y1=Math.max(y1,b.y1);});
+    const cx=(x0+x1)/2,cy=(y0+y1)/2,sc=Math.max(proj.w,proj.h)/Math.max(c.w,c.h),tx=cx/c.w*proj.w,ty=cy/c.h*proj.h;
+    out=objs.map(o=>{const n=mapObj(o,(x,y)=>[(x-cx)*sc+tx,(y-cy)*sc+ty]);n.id=uid();scaleSizes(n,sc);return n;});}
+  pushHistory();if(mode!=='select'){mode='select';tmpP1=tmpP2=tmpTip=null;mpts=[];pendingDim=pendingObj=null;}
+  dims.push(...out);selSet=new Set(out.map(o=>o.id));multi=out.length>1;clipPasted=proj.id+'|'+c.t;changed();
+  toast(`Вставлено: ${out.length}. Сдвинуть — «Ещё» → «Переместить» или стрелками`);}
+
+/* ---------- горячие клавиши (ПК) ---------- */
+let nudgeT=0;
+function escStep(){if(pickStyle){pickStyle=false;updateUI();return;}if(styleOpen){closeStyle();return;}closeMore();
+  if(act){cancelAct();act=null;loupe=null;render();return;}
+  if(tmpP1||tmpP2||tmpTip||mpts.length||pendingDim||pendingObj){tmpP1=tmpP2=tmpTip=null;mpts=[];pendingDim=pendingObj=null;updateUI();render();return;}
+  if(selSet.size||multi||moveMode){selSet.clear();multi=false;moveMode=false;updateUI();render();return;}
+  if(mode!=='select')setMode('select');}
+function setKind(attr,k){if(attr==='k'){setMode('create');dimKind=k;}else if(attr==='t'){setMode('draw');tool=k;}else{setMode('text');labelMode=k;}updateUI();render();}
+document.addEventListener('keydown',e=>{
+  if(modalClose||typing(e.target))return;const ctrl=e.ctrlKey||e.metaKey,k=e.code;
+  if(!proj){if(ctrl&&k==='KeyF'&&!$('#listScreen').classList.contains('hidden')){e.preventDefault();$('#srchIn').focus();}return;}
+  if(ctrl){
+    if(k==='KeyZ'){e.preventDefault();e.shiftKey?redo():undo();}
+    else if(k==='KeyY'){e.preventDefault();redo();}
+    else if(k==='KeyC'||k==='KeyX'){if(selSet.size){e.preventDefault();copySel(k==='KeyX');}}
+    else if(k==='KeyD'){if(selSet.size){e.preventDefault();dupSel();}}
+    else if(k==='KeyA'){e.preventDefault();if(mode!=='select')setMode('select');multi=true;dims.forEach(d=>selSet.add(d.id));updateUI();render();}
+    else if(k==='KeyS'){e.preventDefault();flushAll().then(()=>toast('Сохранено'));}
+    return;}
+  if(e.altKey)return;
+  if(k==='Escape'){e.preventDefault();escStep();return;}
+  if(k==='Delete'||k==='Backspace'){if(selSet.size){e.preventDefault();delSel();}return;}
+  if(k==='F2'||k==='Enter'){if(selDim()){e.preventDefault();editText();}return;}
+  const ar={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[k];
+  if(ar){e.preventDefault();const L=selList();
+    if(!L.length){view.tx-=ar[0]*60;view.ty-=ar[1]*60;render();return;}
+    const st=(e.shiftKey?10:1)/view.s;if(Date.now()-nudgeT>800)pushHistory();nudgeT=Date.now();
+    L.forEach(o=>translateObj(o,ar[0]*st,ar[1]*st));changed();return;}
+  if(e.repeat)return;
+  const map={KeyV:()=>setMode('select'),KeyD:()=>setKind('k','lin'),KeyA:()=>setKind('k','angle'),KeyO:()=>setKind('k','diam'),KeyR:()=>setKind('k','rad'),
+    KeyT:()=>setKind('l','plain'),KeyL:()=>setKind('l','leader'),KeyP:()=>setKind('l','pos'),KeyB:()=>setKind('t','pen'),KeyH:()=>setKind('t','blur'),
+    KeyF:()=>selList().some(o=>isDim(o)||o.type==='angle')?flipSel():fitView(),KeyC:()=>{if(selSet.size)dupSel();},KeyS:()=>quickStyle(),Digit0:()=>fitView(),Equal:()=>zoomAt(1.25,cw/2,ch/2),NumpadAdd:()=>zoomAt(1.25,cw/2,ch/2),Minus:()=>zoomAt(0.8,cw/2,ch/2),NumpadSubtract:()=>zoomAt(0.8,cw/2,ch/2)};
+  if(map[k]){e.preventDefault();cancelAct();map[k]();}});
 
 /* ---------- редактор: состояние ---------- */
 let proj=null,img=null,dims=[],selSet=new Set(),multi=false,mode='select',tmpP1=null,tmpP2=null,pendingDim=null,undoSt=[],redoSt=[],loupe=null;
@@ -1274,7 +1372,7 @@ function barClick(e){const b=e.target.closest('button');if(!b)return;
   else if(b.dataset.t==='faces'){findFaces();return;}
   else if(b.dataset.t)tool=b.dataset.t;
   else if(b.dataset.l){labelMode=b.dataset.l;tmpTip=null;pendingObj=null;}
-  else{const k=b.dataset.b;if(k==='more'){moreMenu(b);return;}closeMore();if(k!=='st')closeStyle();if(k==='e'){editText();return;}if(k==='faces'){findFaces();return;}if(k==='ft'){findHideText();return;}if(k==='stamp'){hideStamp();return;}if(k==='bm'){const o=selDim();if(o&&o.type==='blur'){pushHistory();if(o.mode==='fill')delete o.mode;else o.mode='fill';changed();}return;}if(k==='ls'){const o=selDim();if(o&&o.type==='text'&&o.tip){pushHistory();if(o.ls)delete o.ls;else o.ls=true;settings.labelShelf=!!o.ls;saveSettings();changed();}return;}if(k==='st'){quickStyle();return;}if(k==='c'){dupSel();return;}if(k==='s'){toggleShelf();return;}if(k==='g'){toggleRays();return;}if(k==='f'){flipSel();return;}if(k==='d'){delSel();return;}
+  else{const k=b.dataset.b;if(k==='more'){moreMenu(b);return;}closeMore();if(k!=='st')closeStyle();if(k==='e'){editText();return;}if(k==='faces'){findFaces();return;}if(k==='ft'){findHideText();return;}if(k==='stamp'){hideStamp();return;}if(k==='bm'){const o=selDim();if(o&&o.type==='blur'){pushHistory();if(o.mode==='fill')delete o.mode;else o.mode='fill';changed();}return;}if(k==='ls'){const o=selDim();if(o&&o.type==='text'&&o.tip){pushHistory();if(o.ls)delete o.ls;else o.ls=true;settings.labelShelf=!!o.ls;saveSettings();changed();}return;}if(k==='st'){quickStyle();return;}if(k==='c'){dupSel();return;}if(k==='pv'){pasteClip();return;}if(k==='pvx'){try{localStorage.removeItem(CLIP_KEY);}catch(e){}updateUI();return;}if(k==='pc'){togglePosCirc();return;}if(k==='pk'){startPick();return;}if(k==='s'){toggleShelf();return;}if(k==='g'){toggleRays();return;}if(k==='f'){flipSel();return;}if(k==='d'){delSel();return;}
     if(k==='m')multi=!multi;else if(k==='a'){multi=true;dims.forEach(d=>selSet.add(d.id));}else if(k==='x'){selSet.clear();multi=false;moveMode=false;}else if(k==='mv')moveMode=!moveMode;}
   updateUI();render();}
 $('#ctxBar').addEventListener('click',barClick);$('#subBar').addEventListener('click',barClick);
@@ -1292,15 +1390,16 @@ function updateUI(){if(!proj)return;
   const L=selList(),n=L.length,one=n===1?L[0]:null;let h;
   if(mode==='create'&&dimKind!=='lin')h={angle:['Коснитесь вершины угла','Коснитесь точки на первой стороне','Коснитесь точки на второй стороне'],diam:['Коснитесь края отверстия','Коснитесь противоположного края'],rad:['Коснитесь центра дуги','Коснитесь точки на дуге']}[dimKind][mpts.length];
   else if(mode==='create')h=tmpP2?'Коснитесь, где разместить размерную линию':tmpP1?'Коснитесь второй точки':'Коснитесь первой точки · уточняйте по лупе · 2 пальца — масштаб';
-  else if(mode==='text')h=labelMode==='leader'?(tmpTip?'Коснитесь, где разместить текст':'Коснитесь точки, на которую указывает выноска'):'Коснитесь места для надписи';
+  else if(mode==='text')h=labelMode==='pos'?(tmpTip?`Коснитесь, где поставить номер ${nextPos()}`:'Коснитесь детали — там будет точка выноски'):labelMode==='leader'?(tmpTip?'Коснитесь, где разместить текст':'Коснитесь точки, на которую указывает выноска'):'Коснитесь места для надписи';
   else if(mode==='draw')h={blur:'Обведите рамкой, что скрыть · или кнопки ниже: лица, текст, штамп',faces:'',pen:'Рисуйте пальцем',arrow:'Проведите от начала стрелки к острию',oval:'Протяните, чтобы обвести овалом',rect:'Протяните, чтобы обвести рамкой'}[tool]+' · 2 пальца — масштаб';
   else if(multi)h='Касайтесь объектов, чтобы добавить или убрать из выбора · перетаскивание — сдвиг выбранных';
   else if(one)h=(one.shelf&&isMeas(one)?'■ — полка · ':'')+(isDim(one)?'● — концы, ◆ — линия · ':one.type==='angle'?'● — вершина и стороны, ◆ — дуга · ':MEAS.includes(one.type)?'● — концы · ':(one.type==='text'&&one.tip?'● — острие выноски · ':(one.type==='arrow'?'● — концы · ':ROTT.includes(one.type)?'● — углы, ⟳ — поворот · ':one.type==='pen'?'⟳ — поворот · ':'')))+(isMeas(one)&&!moveMode?'сдвинуть целиком — «Ещё» → «Переместить»':'перетащите, чтобы сдвинуть')+(isMeas(one)||one.type==='text'?' · двойное касание — текст':'');
   else h='Коснитесь объекта, чтобы выбрать · 1 палец — сдвиг фото, 2 — масштаб';
+  if(pickStyle)h='Коснитесь объекта, стиль которого взять для новых · Esc — отмена';
   $('#hint').innerHTML='';$('#hint').append(h);{const x=document.createElement('span');x.className='hx';x.textContent='✕';x.title='Скрыть подсказки';$('#hint').append(x);}$('#hint').classList.toggle('hidden',!!settings.hintOff);$('#hintQ').classList.toggle('hidden',!settings.hintOff);$('#edTitle').textContent=proj.name;
   const sub=$('#subBar'),kinds=mode==='create'?[['lin','⟷','Линейный'],['angle','∠','Угол'],['diam','Ø','Диаметр'],['rad','R','Радиус']]
     :mode==='draw'?[['pen','✎','Карандаш'],['arrow','↗','Стрелка'],['oval','◯','Овал'],['rect','▭','Рамка'],['blur','▦','Скрыть']]
-    :mode==='text'?[['plain','Т','Текст'],['leader','Т↙','С выноской']]:null;
+    :mode==='text'?[['plain','Т','Текст'],['leader','Т↙','С выноской'],['pos','①','Позиция']]:null;
   const attr=mode==='create'?'k':mode==='draw'?'t':'l',cur=mode==='create'?dimKind:mode==='draw'?tool:labelMode;
   if(kinds){sub.innerHTML=kinds.map(([k,sym,l])=>`<button data-${attr}="${k}" class="${cur===k?'on':''}"><b>${sym}</b><span>${l}</span></button>`).join('')
       +(n||(mode==='draw'&&tool==='blur')?'':`<button data-b="st" class="sty${proj.style&&proj.style[styleGrp()]?' own':''}" title="Стиль новых объектов в этом файле"><i style="background:${effStyle().color};box-shadow:0 0 0 ${Math.min(4,Math.max(1.5,effStyle().lw/2))}px rgba(255,255,255,.35)"></i><span>Стиль</span></button>`);sub.classList.remove('hidden');}
@@ -1311,23 +1410,26 @@ function updateUI(){if(!proj)return;
     if(multi)a.push(ab('m','select','Неск.','on'));
     if(one&&(isMeas(one)||one.type==='text'))a.push(ab('e','edit','Текст'));
     if(L.some(o=>isDim(o)||o.type==='angle'))a.push(ab('f','flip','Перевер.'));
-    if(one&&one.type==='text'&&one.tip)a.push(ab('ls','shelf','Полка',one.ls?'on':''));
+    if(one&&one.type==='text'&&one.tip&&!one.pos)a.push(ab('ls','shelf','Полка',one.ls?'on':''));
+    if(one&&one.pos)a.push(ab('pc','shelf',one.circ?'Круг':'Полка'));
     if(one&&one.type==='blur')a.push(ab('bm','all',one.mode==='fill'?'Заливка':'Пиксели'));
     if(one&&isMeas(one)&&one.text)a.push(ab('s','shelf',!one.shelf?'Полка':useLine(one)?'В линию':'Выноска',one.shelf?'on':''));
     a.push(ab('st','style','Стиль',styleOpen?'on':''),ab('d','trash','Удалить','dng'),ab('more','more','Ещё'));}
   else if(mode==='select'&&multi)a.push(ab('m','select','Неск.','on'),ab('a','select','Все'));
+  else if(!multi&&(()=>{const c=clipGet();return c&&c.from!==proj.id&&clipPasted!==proj.id+'|'+c.t;})()){const c=clipGet();a.push(ab('pv','copy',`Вставить ${c.objs.length} из буфера`),`<button data-b="pvx" class="cnt" title="Очистить буфер">✕</button>`);}
   else if(mode==='draw'&&tool==='blur'){a.push(ab('faces','face','Лица'));if(proj.src)a.push(ab('ft','search','Найти текст'));a.push(ab('stamp','stamp','Штамп'));}
   if(styleOpen&&styleOpen.ids!==L.map(o=>o.id).join()){setTimeout(closeStyle,0);}
   const bar=$('#ctxBar');bar.innerHTML=a.join('');bar.classList.toggle('hidden',!a.length);if(!a.length)closeMore();
   if(styleOpen){$('#subBar').classList.add('hidden');}}
 function closeMore(){const m=$('#morePop');if(m)m.classList.add('hidden');}
 function moreMenu(btn){const pop=$('#morePop');if(!pop.classList.contains('hidden')){closeMore();return;}
-  const L=selList(),one=L.length===1?L[0]:null,o=[['mv','move','Переместить',moveMode],['c','copy','Копия']];
+  const L=selList(),one=L.length===1?L[0]:null,o=[['mv','move','Переместить',moveMode],['c','copy','Копия'],['cb','copy','В буфер']];
   if(one&&one.type==='angle')o.push(['g','rays',one.rays===false?'Стороны':'Без сторон']);
+  if(dims.some(x=>x.pos))o.push(['rn','select','Перенумер.']);
   o.push(['m','select','Несколько',multi],['a','all','Все']);
   pop.innerHTML=o.map(([k,i,l,on])=>`<button data-k="${k}" class="${on?'on':''}">${ic(i)}<span>${l}</span></button>`).join('');pop.classList.remove('hidden');
   pop.onclick=e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.k;closeMore();
-    if(k==='mv'){moveMode=!moveMode;updateUI();if(moveMode)toast('Перетащите выделенное за любое место');}else if(k==='st')quickStyle();else if(k==='c')dupSel();else if(k==='g')toggleRays();
+    if(k==='mv'){moveMode=!moveMode;updateUI();if(moveMode)toast('Перетащите выделенное за любое место');}else if(k==='st')quickStyle();else if(k==='c')dupSel();else if(k==='cb')copySel(false);else if(k==='rn')renumberPos();else if(k==='g')toggleRays();
     else if(k==='m'){multi=!multi;updateUI();render();}else if(k==='a'){multi=true;dims.forEach(d=>selSet.add(d.id));updateUI();render();}};}
 document.addEventListener('pointerdown',e=>{const m=$('#morePop');if(m&&!m.classList.contains('hidden')&&!e.target.closest('#morePop')&&!e.target.closest('[data-b=more]'))closeMore();},true);
 
@@ -1355,7 +1457,12 @@ function toggleRays(){const o=selDim();if(!o||o.type!=='angle')return;pushHistor
 function dupSel(){const L=selList();if(!L.length)return;pushHistory();const out=[];
   for(const o of L){const c=clone(o);c.id=uid();const k=o.fs*1.5;translateObj(c,k,k);out.push(c);}
   dims.push(...out);selSet=new Set(out.map(o=>o.id));changed();toast(out.length>1?`Скопировано: ${out.length}`:'Скопировано');}
-let styleOpen=null;
+let styleOpen=null,pickStyle=false;
+function startPick(){closeStyle();pickStyle=true;selSet.clear();multi=false;updateUI();render();}
+function pickFrom(o){pickStyle=false;if(!o){toast('Объект не найден — стиль не изменён');updateUI();return;}
+  if(o.type==='blur'){toast('У скрытия нет цвета и толщины');updateUI();return;}
+  const g=styleGrp(),base=Math.max(proj.w,proj.h)/1000;proj.style={...(proj.style||{}),[g]:{color:o.color,lw:Math.round(o.lw/base*2)/2,fs:Math.round(o.fs/base),halo:o.halo!==false}};
+  changed();toast(`Стиль ${STYLE_NAMES[g]} в этом файле взят с объекта`);}
 function closeStyle(){if(!styleOpen)return;const st=styleOpen;styleOpen=null;$('#stylePanel').classList.add('hidden');$('#stylePanel').innerHTML='';
   if(st.defs){updateUI();return;}
   if(st.touched&&proj){pushHistory(st.before);changed();}else updateUI();}
@@ -1364,7 +1471,7 @@ function quickStyle(){if(styleOpen){closeStyle();return;}if(!proj)return;const L
   styleOpen={before:JSON.stringify(dims),touched:false,ids:L.map(o=>o.id).join(),defs};
   const COLORS=['#e53935','#ffd600','#00c853','#2979ff','#ff6d00','#ffffff','#111111'];
   const el=$('#stylePanel');const lw0=Math.round(f.lw/base*2)/2,fs0=Math.round(f.fs/base);
-  el.innerHTML=`${defs?`<div class="row"><b class="t" style="width:auto;flex:1">Стиль ${STYLE_NAMES[g]} в этом файле</b><button class="rs" style="${proj.style&&proj.style[g]?'':'display:none'}">Как в Настройках</button></div>`:''}<div class="row"><div class="sws"></div></div>
+  el.innerHTML=`${defs?`<div class="row"><b class="t" style="width:auto;flex:1">Стиль ${STYLE_NAMES[g]} в этом файле</b></div><div class="row"><button class="pk">⌖ Взять с объекта</button><button class="rs" style="${proj.style&&proj.style[g]?'':'display:none'}">Как в Настройках</button></div>`:''}<div class="row"><div class="sws"></div></div>
   <div class="row"><label class="t">Толщина</label><input type="range" class="lw" min="1" max="12" step="0.5" value="${lw0}"><span class="v lwv">${lw0}</span></div>
   <div class="row"><label class="t">Шрифт</label><input type="range" class="fs" min="12" max="100" step="1" value="${fs0}"><span class="v fsv">${fs0}</span></div>
   <div class="row"><label class="chk"><input type="checkbox" class="halo"> Контрастная обводка</label><button class="ok">Готово</button></div>`;
@@ -1380,6 +1487,7 @@ function quickStyle(){if(styleOpen){closeStyle();return;}if(!proj)return;const L
   q('.fs').oninput=e=>{q('.fsv').textContent=e.target.value;apply('fs',+e.target.value*base,+e.target.value);};
   q('.halo').onchange=e=>apply('halo',e.target.checked);
   q('.ok').onclick=()=>closeStyle();
+  if(defs)q('.pk').onclick=()=>startPick();
   if(defs)q('.rs').onclick=()=>{if(proj.style){delete proj.style[g];if(!Object.keys(proj.style).length)delete proj.style;}changed();closeStyle();toast('Стиль '+STYLE_NAMES[g]+' — как в Настройках');};
   el.classList.remove('hidden');updateUI();}
 function flipSel(){const L=selList().filter(o=>isDim(o)||o.type==='angle');if(!L.length)return;pushHistory();
@@ -1443,7 +1551,7 @@ function drawOverlay(){drawSnap();
   for(const o of L){ctx.beginPath();
     if(isDim(o)){const g=dimGeom(o);if(!g)continue;const a=toScr(g.ax,g.ay),b=toScr(g.bx,g.by),p1=toScr(o.x1,o.y1),p2=toScr(o.x2,o.y2);
       ctx.moveTo(p1.x,p1.y);ctx.lineTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineTo(p2.x,p2.y);}
-    else if(rotOf(o)){const P=rotCorners(o).map(q=>toScr(q.x,q.y));ctx.moveTo(P[0].x,P[0].y);for(let i=1;i<4;i++)ctx.lineTo(P[i].x,P[i].y);ctx.closePath();}
+    else if(rotOf(o)||textRot(o)){const P=(textRot(o)?textPoly(o):rotCorners(o)).map(q=>toScr(q.x,q.y));ctx.moveTo(P[0].x,P[0].y);for(let i=1;i<4;i++)ctx.lineTo(P[i].x,P[i].y);ctx.closePath();}
     else{const Bx=objBounds(o),a=toScr(Bx.x0,Bx.y0),b=toScr(Bx.x1,Bx.y1),m=6;ctx.rect(a.x-m,a.y-m,b.x-a.x+2*m,b.y-a.y+2*m);}
     ctx.stroke();}
   ctx.setLineDash([]);
@@ -1474,7 +1582,7 @@ function hitObj(p){const q=toImg(p),tol=20/view.s;let best=null,bd=Infinity;
 function objHandles(o){const hs=objHandles0(o);if(o.shelf&&isMeas(o)){const LS=useLine(o)?lineShelfLayout(o):null;hs.push(LS?{k:'sh',x:LS.x2,y:LS.y2,sq:true}:{k:'sh',x:o.shelf.x,y:o.shelf.y,sq:true});}return hs;}
 function objHandles0(o){
   if(isDim(o)){const g=dimGeom(o);if(!g)return [];const oh=offHandle(g);return [{k:'p1',x:o.x1,y:o.y1},{k:'p2',x:o.x2,y:o.y2},{k:'off',x:oh.x,y:oh.y,dia:true}];}
-  if(o.type==='text')return o.tip?[{k:'tip',x:o.tip.x,y:o.tip.y}]:[];
+  if(o.type==='text'){if(o.tip)return [{k:'tip',x:o.tip.x,y:o.tip.y}];const L=labelLayout(o);return [rotHandle({x:o.x,y:o.y},L.h/2+L.pad,textRot(o))];}
   if(o.type==='pen'){const B=objBounds0(o);return [rotHandle({x:(B.x0+B.x1)/2,y:(B.y0+B.y1)/2},(B.y1-B.y0)/2,0)];}
   if(ROTT.includes(o.type)){const r=rotOf(o),c=boxC(o),a=rotPt(o.x1,o.y1,c,r),b=rotPt(o.x2,o.y2,c,r);
     return [{k:'a',x:a.x,y:a.y},{k:'b',x:b.x,y:b.y},rotHandle(c,Math.abs(o.y2-o.y1)/2,r)];}
@@ -1585,10 +1693,18 @@ async function finishMplace(a){const ip=a.ip;if(!ip)return;
   const v=await askDimText(o.text,true);pendingObj=null;
   if(v===null||!proj){render();updateUI();return;}
   o.text=v;rememberText(v);pushHistory();dims.push(o);selSet=new Set([o.id]);changed();}
-function lplaceAt(p){const ip=(labelMode==='leader'&&!tmpTip)?snap(clampImg(toImg(p)),null):clampImg(toImg(p));act.ip=ip;loupe=act.touchy?{ix:ip.x,iy:ip.y,sx:p.x,sy:p.y}:null;
-  if(tmpTip)pendingObj={...newBase(),type:'text',x:ip.x,y:ip.y,text:'Текст',tip:{...tmpTip},ls:settings.labelShelf!==false};render();}
+const leaderMode=()=>labelMode==='leader'||labelMode==='pos';
+function posObj(ip,tip,text){const o={...newBase(),type:'text',x:ip.x,y:ip.y,text,tip:{...tip},pos:true};if(settings.posCirc)o.circ=true;else o.ls=true;return o;}
+function nextPos(){let m=0;for(const o of dims)if(o.pos){const n=parseInt(o.text,10);if(n>m)m=n;}return m+1;}
+function renumberPos(){const P=dims.filter(o=>o.pos);if(!P.length)return;pushHistory();
+  P.map((o,i)=>({o,n:parseInt(o.text,10),i})).sort((a,b)=>(isNaN(a.n)?1e9:a.n)-(isNaN(b.n)?1e9:b.n)||a.i-b.i).forEach((x,i)=>{x.o.text=String(i+1);});
+  changed();toast(`Позиции перенумерованы: 1–${P.length}`);}
+function togglePosCirc(){const o=selDim();if(!o||!o.pos)return;pushHistory();if(o.circ){delete o.circ;o.ls=true;}else{o.circ=true;delete o.ls;}settings.posCirc=!!o.circ;saveSettings();changed();}
+function lplaceAt(p){const ip=(leaderMode()&&!tmpTip)?snap(clampImg(toImg(p)),null):clampImg(toImg(p));act.ip=ip;loupe=act.touchy?{ix:ip.x,iy:ip.y,sx:p.x,sy:p.y}:null;
+  if(tmpTip)pendingObj=labelMode==='pos'?posObj(ip,tmpTip,String(nextPos())):{...newBase(),type:'text',x:ip.x,y:ip.y,text:'Текст',tip:{...tmpTip},ls:settings.labelShelf!==false};render();}
 async function finishLplace(a){const ip=a.ip;if(!ip)return;
-  if(labelMode==='leader'&&!tmpTip){tmpTip=ip;updateUI();render();return;}
+  if(leaderMode()&&!tmpTip){tmpTip=ip;updateUI();render();return;}
+  if(labelMode==='pos'){const o=posObj(ip,tmpTip,String(nextPos()));tmpTip=null;pendingObj=null;pushHistory();dims.push(o);selSet=new Set([o.id]);changed();return;}
   const o={...newBase(),type:'text',x:ip.x,y:ip.y,text:'…',tip:tmpTip?{...tmpTip}:null};if(o.tip&&settings.labelShelf!==false)o.ls=true;tmpTip=null;pendingObj=o;updateUI();render();
   const v=await askLabel('');pendingObj=null;
   if(!v||!proj){render();updateUI();return;}
@@ -1603,6 +1719,7 @@ cv.addEventListener('pointerdown',e=>{
   const p=pos(e);ptrs.set(e.pointerId,p);
   if(ptrs.size===2){cancelAct();startPinch();return;}
   if(ptrs.size>2||locked)return;
+  if(pickStyle){pickFrom(hitObj(p));ptrs.delete(e.pointerId);return;}
   const touchy=e.pointerType!=='mouse';
   if(e.pointerType==='mouse'&&e.button!==0){act={k:'pan',last:p};gestStart();return;}
   if(mode!=='select'&&styleOpen)closeStyle();
@@ -1675,17 +1792,6 @@ function doTap(p,mod){const d=hitObj(p),now=Date.now();
   else{selSet.clear();moveMode=false;lastTap={t:0,id:null};}
   updateUI();render();}
 
-document.addEventListener('keydown',e=>{
-  if(!proj||modalClose)return;
-  if((e.ctrlKey||e.metaKey)&&e.code==='KeyZ'){e.preventDefault();e.shiftKey?redo():undo();}
-  else if((e.ctrlKey||e.metaKey)&&e.code==='KeyY'){e.preventDefault();redo();}
-  else if(e.key==='Delete')delSel();
-  else if(!e.ctrlKey&&!e.metaKey&&!e.altKey&&!act){const k=e.code;
-    if(k==='KeyV')setMode('select');else if(k==='KeyD')setMode('create');else if(k==='KeyT')setMode('text');else if(k==='KeyP')setMode('draw');
-    else if(k==='KeyF')flipSel();else if(k==='KeyC')dupSel();else if(k==='KeyS')quickStyle();else return;}
-  else if((e.ctrlKey||e.metaKey)&&e.code==='KeyA'&&mode==='select'){e.preventDefault();dims.forEach(d=>selSet.add(d.id));updateUI();render();}
-  else if(e.key==='Escape'){if(tmpP1||tmpP2||tmpTip||mpts.length){tmpP1=null;tmpP2=null;tmpTip=null;mpts=[];pendingDim=null;pendingObj=null;}else{selSet.clear();multi=false;}updateUI();render();}});
-
 /* ---------- оформление ---------- */
 function applyStyle(list){if(!list.length)return;pushHistory();const base=Math.max(proj.w,proj.h)/1000;
   for(const d of list){d.color=settings.color;d.lw=settings.lw*base;d.fs=settings.fs*base;d.halo=settings.halo;}changed();}
@@ -1710,6 +1816,11 @@ function openSettings(tab){return modal((box,close)=>{
   <label class="chk"><input type="checkbox" class="askn"> Спрашивать название при создании проекта</label>
   <label class="chk"><input type="checkbox" class="adjl"> Подгонка фото (поворот, кадрирование) при загрузке</label>
   <label class="chk"><input type="checkbox" class="hnt"> Показывать подсказки в редакторе</label>
+  <div class="lbl">Компьютер: клавиши и файлы</div>
+  <p class="note">Ctrl+V — новый проект из скриншота, или вставка разметки из буфера · перетащите фото или PDF в окно<br>
+  V выбор · D размер (A угол, O диаметр, R радиус) · T надпись (L с выноской, P позиция) · B рисунок · H скрыть<br>
+  Delete удалить · Ctrl+Z / Ctrl+Y отмена / повтор · Ctrl+C / Ctrl+X / Ctrl+V разметка · Ctrl+D копия · Ctrl+A всё<br>
+  Стрелки — сдвиг выделенного (Shift — крупнее) · Enter / F2 — текст · S — стиль · F — перевернуть размер (без выделения — вписать) · 0 — вписать · + / − масштаб · Esc — отмена</p>
   </div>
   <div data-pane="s"><p class="note">Действует на новые размеры, надписи и рисунки. Уже нанесённые меняются только кнопками применения ниже.</p>
   <div class="lbl">Цвет линий и текста</div><div class="sws"></div>
@@ -1930,7 +2041,8 @@ function validateBackup(o){
     if(!(isNum(p.w)&&isNum(p.h)&&p.w>0&&p.h>0))throw w+': неверные размеры фото.';
     if(typeof p.photo!=='string'||!/^data:image\/[a-z0-9+.-]+;base64,/i.test(p.photo))throw w+': нет фотографии.';
     if(!Array.isArray(p.dims)||!p.dims.every(validObj))throw w+': повреждены данные разметки.';});}
-function cleanObj(d){const r=cleanObj0(d);if(r.type==='text'&&r.tip&&d.ls===true)r.ls=true;if(d.shelf&&isMeas(r)){r.shelf={x:d.shelf.x,y:d.shelf.y};if(d.shelfLine===true)r.shelfLine=true;}if(r.type==='angle'&&d.rays===false)r.rays=false;return r;}
+function cleanObj(d){const r=cleanObj0(d);if(r.type==='text'&&r.tip&&d.ls===true)r.ls=true;
+  if(r.type==='text'&&d.pos===true){r.pos=true;if(d.circ===true)r.circ=true;}if(r.type==='text'&&!r.tip&&isNum(d.rot)&&d.rot)r.rot=normDeg(d.rot);if(d.shelf&&isMeas(r)){r.shelf={x:d.shelf.x,y:d.shelf.y};if(d.shelfLine===true)r.shelfLine=true;}if(r.type==='angle'&&d.rays===false)r.rays=false;return r;}
 function cleanObj0(d){const t=d.type||'dim',b={id:d.id,color:/^#[0-9a-f]{6}$/i.test(d.color||'')?d.color:'#e53935',lw:d.lw,fs:d.fs,halo:d.halo!==false};
   if(t==='dim')return {...b,x1:d.x1,y1:d.y1,x2:d.x2,y2:d.y2,off:d.off,text:d.text};
   if(t==='text')return {...b,type:'text',x:d.x,y:d.y,text:d.text,tip:d.tip?{x:d.tip.x,y:d.tip.y}:null};
