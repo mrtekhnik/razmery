@@ -201,6 +201,8 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
 #morePop button.on{background:var(--accent)}
 #stylePanel{background:#161b21;color:#e9eef5;padding:8px 10px 6px;display:flex;flex-direction:column;gap:6px}
 #stylePanel .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#stylePanel .hls{display:flex;gap:4px;flex:1}#stylePanel .hls button{flex:1;height:34px;border-radius:8px;background:rgba(255,255,255,.1);color:#e9eef5}#stylePanel .hls button.on{background:var(--accent);color:#fff}
+#stylePanel .lo{height:34px;padding:0 12px;border-radius:8px;background:rgba(255,255,255,.1);color:#e9eef5}
 #stylePanel .al{height:34px;padding:0 12px;border-radius:8px;background:rgba(255,255,255,.1);color:#e9eef5}#stylePanel .al.on{background:var(--accent);color:#fff}
 #stylePanel .sws{gap:7px;flex:1;flex-wrap:nowrap;overflow-x:auto}
 #stylePanel .sw{width:32px;height:32px;flex:none;border-color:#3a434e}
@@ -288,7 +290,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.39',APP_DATE='05.11.2026';
+const APP_VERSION='1.40',APP_DATE='05.11.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -487,7 +489,11 @@ function drawObj(c,o,src){if(o.type==='blur')return drawBlur(c,o,src===undefined
 const tolOf=o=>o.tol&&(o.tol.u||o.tol.l)?o.tol:null;
 function dimTextW(o,fs){mctx.font=FONT(fs);let w=mctx.measureText(o.text).width;const t=tolOf(o);
   if(t){mctx.font=FONT(fs*0.6);w+=fs*0.12+Math.max(mctx.measureText(t.u||'').width,mctx.measureText(t.l||'').width);}return w;}
-function drawDimText(c,o,x,y,halo,hc){const fs=o.fs,t=tolOf(o),W=dimTextW(o,fs);mctx.font=FONT(fs);const w0=mctx.measureText(o.text).width,x0=x-W/2;
+// акцент: плашка (заливка контрастным цветом) или рамка вокруг текста
+function drawAccent(c,o,cx,cy,w,h){if(!o.hl)return;const p=o.fs*0.22,x=cx-w/2-p,y=cy-h/2-p*0.45,W=w+2*p,H=h+0.9*p,r=o.fs*0.18;
+  c.save();c.beginPath();if(c.roundRect)c.roundRect(x,y,W,H,r);else c.rect(x,y,W,H);
+  if(o.hl==='bg'){c.fillStyle=haloColor(o.color);c.globalAlpha=0.88;c.fill();}else{c.strokeStyle=o.color;c.lineWidth=Math.max(o.lw,o.fs*0.06);c.stroke();}c.restore();}
+function drawDimText(c,o,x,y,halo,hc){const fs=o.fs,t=tolOf(o),W=dimTextW(o,fs);mctx.font=FONT(fs);const w0=mctx.measureText(o.text).width,x0=x-W/2;drawAccent(c,o,x,y,W,fs*(t?1.2:0.95));
   const put=(s,f,px,py)=>{c.font=FONT(f);c.textAlign='left';c.textBaseline='middle';if(halo){c.lineWidth=f*0.18;c.strokeStyle=hc;c.strokeText(s,px,py);}c.fillStyle=o.color;c.fillText(s,px,py);};
   put(o.text,fs,x0,y);if(t){const tx=x0+w0+fs*0.12,f=fs*0.6;if(t.u)put(t.u,f,tx,y-fs*0.28);if(t.l)put(t.l,f,tx,y+fs*0.28);}}
 function textAlong(o,mx,my,ux,uy,nx,ny,base){let th=Math.atan2(uy,ux);
@@ -611,6 +617,7 @@ function drawLabel(c,o){const L=labelLayout(o),halo=o.halo!==false,hc=haloColor(
     c.strokeStyle=o.color;c.fillStyle=o.color;c.lineWidth=o.lw;lp();c.stroke();tp();c.fill();}
   const tr=textRot(o);if(tr){c.translate(o.x,o.y);c.rotate(tr*Math.PI/180);c.translate(-o.x,-o.y);}
   c.font=FONT(o.fs);c.textAlign='center';c.textBaseline='middle';const y0=o.y-L.lh*L.lines.length/2;
+  if(!L.circ&&o.sym!=='base')drawAccent(c,o,o.x,o.y,L.w,L.lh*L.lines.length);
   L.lines.forEach((ln,i)=>{const y=y0+L.lh*(i+0.5);if(halo){c.lineWidth=o.fs*0.18;c.strokeStyle=hc;c.strokeText(ln,o.x,y);}c.fillStyle=o.color;c.fillText(ln,o.x,y);});
   c.restore();}
 const arrowHead=o=>[Math.max(o.lw*4,o.fs*0.6),Math.max(o.lw*1.6,o.fs*0.22)];
@@ -1522,19 +1529,21 @@ function pickFrom(o){pickStyle=false;if(!o){toast('Объект не найде�
   changed();toast(`Стиль ${STYLE_NAMES[g]} в этом файле взят с объекта`);}
 function closeStyle(){if(!styleOpen)return;const st=styleOpen;styleOpen=null;$('#stylePanel').classList.add('hidden');$('#stylePanel').innerHTML='';
   if(st.defs){if(st.objTouched){pushHistory(st.before);changed();}else updateUI();return;}
-  if(st.touched&&proj){pushHistory(st.before);changed();}else updateUI();}
+  if(st.touched&&proj){pushHistory(st.before);changed();}else updateUI();
+  if(st.backMode&&proj&&st.backMode!=='select'){selSet.clear();setMode(st.backMode);}}
 function quickStyle(){if(styleOpen){closeStyle();return;}if(!proj)return;const L=selList(),defs=!L.length;closeMore();const base=Math.max(proj.w,proj.h)/1000;
   const g=styleGrp(),e0=effStyle(g),f=defs?{color:e0.color,lw:e0.lw*base,fs:e0.fs*base,halo:e0.halo}:L[0];
   const grpOf=o=>isMeas(o)?'dim':o.type==='text'?'text':o.type==='blur'?'':'draw';
   const sg=defs?g:(L.every(o=>grpOf(o)===grpOf(L[0]))?grpOf(L[0]):'');
   const grpObjs=()=>sg?dims.filter(o=>grpOf(o)===sg):[],nAll=defs?grpObjs().length:(sg?grpObjs().length-L.length:0);
   let allOn=nAll>0&&defs&&!!settings.styleAll;
+  const lastObj=defs?grpObjs().at(-1):null,hasText=!defs&&L.every(o=>isMeas(o)||(o.type==='text'&&!o.pos&&!o.sym));
   const applyAll=()=>{const base2=Math.max(proj.w,proj.h)/1000;grpObjs().forEach(o=>{o.color=f.color;o.lw=f.lw;o.fs=f.fs;o.halo=f.halo;});
     proj.style={...(proj.style||{}),[sg]:{color:f.color,lw:Math.round(f.lw/base2*2)/2,fs:Math.round(f.fs/base2),halo:f.halo!==false}};styleOpen.touched=true;styleOpen.objTouched=true;};
   styleOpen={before:JSON.stringify(dims),touched:false,ids:L.map(o=>o.id).join(),defs};
   const COLORS=['#e53935','#ffd600','#00c853','#2979ff','#ff6d00','#ffffff','#111111'];
   const el=$('#stylePanel');const lw0=Math.round(f.lw/base*2)/2,fs0=Math.round(f.fs/base);
-  el.innerHTML=`${!defs&&nAll?`<div class="row"><button class="al${allOn?' on':''}">${({dim:'Ко всем размерам',text:'Ко всем надписям',draw:'Ко всем фигурам'})[sg]} в файле (+${nAll})</button></div>`:''}${defs?`<div class="row"><b class="t" style="width:auto;flex:1">Стиль ${STYLE_NAMES[g]} в этом файле</b></div><div class="row"><button class="pk">⌖ Взять с объекта</button>${nAll?`<button class="al${allOn?' on':''}">И уже нанесённые (${nAll})</button>`:''}<button class="rs" style="${proj.style&&proj.style[g]?'':'display:none'}">Как в Настройках</button></div>`:''}<div class="row"><div class="sws"></div></div>
+  el.innerHTML=`${hasText?`<div class="row"><label class="t">Акцент</label><div class="hls"><button data-h="">Нет</button><button data-h="bg">Плашка</button><button data-h="box">Рамка</button></div></div>`:''}${!defs&&nAll?`<div class="row"><button class="al${allOn?' on':''}">${({dim:'Ко всем размерам',text:'Ко всем надписям',draw:'Ко всем фигурам'})[sg]} в файле (+${nAll})</button></div>`:''}${defs?`<div class="row"><b class="t" style="width:auto;flex:1">Стиль ${STYLE_NAMES[g]} в этом файле</b></div><div class="row"><button class="pk">⌖ Взять с объекта</button>${lastObj?'<button class="lo">Только последний</button>':''}${nAll?`<button class="al${allOn?' on':''}">И уже нанесённые (${nAll})</button>`:''}<button class="rs" style="${proj.style&&proj.style[g]?'':'display:none'}">Как в Настройках</button></div>`:''}<div class="row"><div class="sws"></div></div>
   <div class="row"><label class="t">Толщина</label><input type="range" class="lw" min="1" max="12" step="0.5" value="${lw0}"><span class="v lwv">${lw0}</span></div>
   <div class="row"><label class="t">Шрифт</label><input type="range" class="fs" min="12" max="100" step="1" value="${fs0}"><span class="v fsv">${fs0}</span></div>
   <div class="row"><label class="chk"><input type="checkbox" class="halo"> Контрастная обводка</label><button class="ok">Готово</button></div>`;
@@ -1553,6 +1562,9 @@ function quickStyle(){if(styleOpen){closeStyle();return;}if(!proj)return;const L
   q('.halo').onchange=e=>apply('halo',e.target.checked);
   q('.ok').onclick=()=>closeStyle();
   if(defs)q('.pk').onclick=()=>startPick();
+  if(q('.lo'))q('.lo').onclick=()=>{const o=lastObj,pm=mode;closeStyle();if(!dims.includes(o))return;if(mode!=='select'){mode='select';tmpP1=tmpP2=tmpTip=null;mpts=[];pendingDim=pendingObj=null;}selSet=new Set([o.id]);multi=false;updateUI();render();quickStyle();if(styleOpen)styleOpen.backMode=pm;};
+  if(hasText){const hb=[...el.querySelectorAll('.hls button')],mk=()=>hb.forEach(b=>b.classList.toggle('on',L.every(o=>(o.hl||'')===b.dataset.h)));mk();
+    hb.forEach(b=>b.onclick=()=>{styleOpen.touched=true;for(const o of L){if(b.dataset.h)o.hl=b.dataset.h;else delete o.hl;}if(allOn)grpObjs().forEach(o=>{if(b.dataset.h)o.hl=b.dataset.h;else delete o.hl;});mk();render();});}
   if(q('.al'))q('.al').onclick=()=>{allOn=!allOn;if(defs){settings.styleAll=allOn;saveSettings();}q('.al').classList.toggle('on',allOn);
     if(allOn){applyAll();changed();toast(defs?`Стиль применён к ${nAll} уже нанесённым`:`Тот же стиль — у всех: ${nAll+L.length}, и у новых в этом файле`);}};
   if(defs)q('.rs').onclick=()=>{if(proj.style){delete proj.style[g];if(!Object.keys(proj.style).length)delete proj.style;}changed();closeStyle();toast('Стиль '+STYLE_NAMES[g]+' — как в Настройках');};
@@ -2132,7 +2144,7 @@ function validateBackup(o){
     if(!(isNum(p.w)&&isNum(p.h)&&p.w>0&&p.h>0))throw w+': неверные размеры фото.';
     if(typeof p.photo!=='string'||!/^data:image\/[a-z0-9+.-]+;base64,/i.test(p.photo))throw w+': нет фотографии.';
     if(!Array.isArray(p.dims)||!p.dims.every(validObj))throw w+': повреждены данные разметки.';});}
-function cleanObj(d){const r=cleanObj0(d);
+function cleanObj(d){const r=cleanObj0(d);if((isMeas(r)||r.type==='text')&&(d.hl==='bg'||d.hl==='box'))r.hl=d.hl;
   if(isMeas(r)){if(d.tol&&typeof d.tol==='object'&&(typeof d.tol.u==='string'||typeof d.tol.l==='string'))r.tol={u:String(d.tol.u||''),l:String(d.tol.l||'')};if(typeof d.expr==='string'&&d.expr)r.expr=d.expr;}if(r.type==='text'&&r.tip&&d.ls===true)r.ls=true;
   if(r.type==='text'&&r.tip&&SYMS.includes(d.sym))r.sym=d.sym;
   if(r.type==='text'&&d.pos===true){r.pos=true;if(d.circ===true)r.circ=true;}if(r.type==='text'&&!r.tip&&isNum(d.rot)&&d.rot)r.rot=normDeg(d.rot);if(d.shelf&&isMeas(r)){r.shelf={x:d.shelf.x,y:d.shelf.y};if(d.shelfLine===true)r.shelfLine=true;}if(r.type==='angle'&&d.rays===false)r.rays=false;return r;}
