@@ -214,6 +214,11 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
 #stylePanel .chk input{width:20px;height:20px}
 #stylePanel .pk,#stylePanel .rs{height:34px;padding:0 12px;border-radius:8px;background:rgba(255,255,255,.1);color:#e9eef5}
 #stylePanel .ok{height:38px;padding:0 18px;border-radius:8px;background:var(--accent);color:#fff;font-weight:600}
+#lockScr{position:fixed;inset:0;z-index:500;background:#1d2733;display:flex;align-items:center;justify-content:center;padding:24px;overflow:auto}
+#lockScr .lk{width:100%;max-width:340px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;color:#e9eef5}
+#lockScr h2{margin:4px 0 8px;font-size:20px}#lockScr .inp{width:100%;text-align:center;font-size:20px;letter-spacing:2px}
+#lockScr .btn{width:100%}#lockScr .lkm{min-height:20px;color:#ff8a80;margin:0}#lockScr .lkf{color:#9fb0c3;text-decoration:underline;font-size:14px;margin-top:8px}
+#lockScr .lkr{font-size:14px;color:#c7d2de;text-align:left;line-height:1.45}
 #busy{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center}
 #busy span{background:#fff;padding:14px 22px;border-radius:12px}
 </style>
@@ -281,6 +286,7 @@ textarea.inp{height:auto;min-height:120px;padding:10px 12px;resize:vertical;font
 <div id="toast" class="hidden"></div>
 <div id="updBar" class="hidden"><span>Доступна новая версия</span><button id="updBtn">Обновить</button></div>
 <div id="busy" class="hidden"><span>Подождите…</span></div>
+<div id="lockScr" class="hidden"></div>
 
 <script>
 'use strict';
@@ -290,7 +296,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.41',APP_DATE='09.11.2026';
+const APP_VERSION='1.42',APP_DATE='09.11.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -1274,7 +1280,7 @@ async function addOutside(files,how){
   busy(false);await renderList();toast(`Добавлено фото: ${ok}`+(ok<ims.length?` · не открылось: ${ims.length-ok}`:''));
   if(pdfs.length){toast('PDF открываются по одному');importPdf(pdfs[0]);}}
 const typing=t=>t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable);
-document.addEventListener('paste',e=>{if(modalClose||typing(e.target))return;
+document.addEventListener('paste',e=>{if(appLocked||modalClose||typing(e.target))return;
   const files=[...((e.clipboardData&&e.clipboardData.files)||[])].filter(f=>isImg(f)||isPdf(f));
   if(files.length){e.preventDefault();addOutside(files,'paste');return;}
   if(proj&&clipGet()){e.preventDefault();pasteClip();}});
@@ -1282,7 +1288,7 @@ document.addEventListener('paste',e=>{if(modalClose||typing(e.target))return;
   window.addEventListener('dragenter',e=>{if(!hasFiles(e))return;e.preventDefault();depth++;if(!modalClose)ov().classList.remove('hidden');});
   window.addEventListener('dragover',e=>{if(!hasFiles(e))return;e.preventDefault();e.dataTransfer.dropEffect=modalClose?'none':'copy';});
   window.addEventListener('dragleave',e=>{if(!hasFiles(e))return;depth=Math.max(0,depth-1);if(!depth)ov().classList.add('hidden');});
-  window.addEventListener('drop',e=>{if(!hasFiles(e))return;e.preventDefault();depth=0;ov().classList.add('hidden');if(modalClose)return;addOutside([...e.dataTransfer.files],'drop');});}
+  window.addEventListener('drop',e=>{if(!hasFiles(e))return;e.preventDefault();depth=0;ov().classList.add('hidden');if(modalClose||appLocked)return;addOutside([...e.dataTransfer.files],'drop');});}
 
 /* ---------- буфер разметки: копировать на одном фото, вставить на другом ---------- */
 const CLIP_KEY='razmery.clip';let clipPasted='';
@@ -1311,7 +1317,7 @@ function escStep(){if(pickStyle){pickStyle=false;updateUI();return;}if(styleOpen
   if(mode!=='select')setMode('select');}
 function setKind(attr,k){if(attr==='k'){setMode('create');dimKind=k;}else if(attr==='t'){setMode('draw');tool=k;}else{setMode('text');labelMode=k;symOpen=SYMS.includes(k);}updateUI();render();}
 document.addEventListener('keydown',e=>{
-  if(modalClose||typing(e.target))return;const ctrl=e.ctrlKey||e.metaKey,k=e.code;
+  if(appLocked||modalClose||typing(e.target))return;const ctrl=e.ctrlKey||e.metaKey,k=e.code;
   if(!proj){if(ctrl&&k==='KeyF'&&!$('#listScreen').classList.contains('hidden')){e.preventDefault();$('#srchIn').focus();}return;}
   if(ctrl){
     if(k==='KeyZ'){e.preventDefault();e.shiftKey?redo():undo();}
@@ -1889,7 +1895,7 @@ function applyStyle(list){if(!list.length)return;pushHistory();const base=Math.m
 function openSettings(tab){return modal((box,close)=>{
   const COLORS=['#e53935','#ffd600','#00c853','#2979ff','#ff6d00','#ffffff','#111111'];
   box.innerHTML=`<h3>Настройки</h3>
-  <div class="tabs"><button data-tab="p">Простановка</button><button data-tab="s">Оформление</button><button data-tab="y">Синхронизация</button></div>
+  <div class="tabs"><button data-tab="p">Простановка</button><button data-tab="s">Вид</button><button data-tab="y">Синхр.</button><button data-tab="z">Защита</button></div>
   <div data-pane="p">
   <div class="lbl">Положение размерной линии при простановке</div>
   <label class="radio"><input type="radio" name="pm" value="click3"><span>Третьим касанием<small>После второй точки линия следует за пальцем — коснитесь, где её поставить (как в CAD)</small></span></label>
@@ -1942,10 +1948,34 @@ function openSettings(tab){return modal((box,close)=>{
   <div class="seg sd"><button data-d="0">Сразу</button><button data-d="3600000">Через 1 ч</button><button data-d="10800000">Через 3 ч</button><button data-d="86400000">Через сутки</button></div>
   <p class="note">Отсчёт — от первого несинхронизированного изменения.</p>
   </div>
+  <div data-pane="z">
+  <p class="note zst"></p>
+  <div class="zcur"><div class="lbl">Текущий пароль</div><input class="inp sm zp0" type="password" autocomplete="current-password"></div>
+  <div class="lbl zl1">Новый пароль или PIN (от 4 символов)</div><input class="inp sm zp1" type="password" autocomplete="new-password">
+  <div class="lbl">Повторите</div><input class="inp sm zp2" type="password" autocomplete="new-password">
+  <div class="row2"><button class="btn zsv">Сохранить пароль</button><button class="btn ghost zoff">Отключить защиту</button></div>
+  <p class="note zmsg"></p>
+  <label class="chk zbio"><input type="checkbox" class="zb"> Отпечаток пальца или лицо</label>
+  <div class="lbl">Снова спрашивать после работы в фоне</div>
+  <div class="seg zaf"><button data-a="0">Сразу</button><button data-a="1">1 мин</button><button data-a="5">5 мин</button><button data-a="15">15 мин</button><button data-a="-1">При запуске</button></div>
+  <p class="note">Защита закрывает экран приложения. Сами фото хранятся в памяти браузера без шифрования. Пароль не восстанавливается: если забудете, на экране входа можно удалить проекты на этом устройстве и снять защиту, а потом вернуть проекты синхронизацией или из резервной копии.</p>
+  </div>
   <div class="mbtns"><button class="btn pri ok">Готово</button></div>`;
   const showTab=t=>{box.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));box.querySelectorAll('[data-pane]').forEach(d=>d.classList.toggle('hidden',d.dataset.pane!==t));
     if(t==='s')requestAnimationFrame(()=>upd(true));};
   box.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));showTab(tab||'p');
+  {const q=c=>box.querySelector(c),msg=t=>q('.zmsg').textContent=t;
+    const upd=async()=>{const c=lockCfg(),on=!!(c&&c.hash);q('.zst').textContent=on?`Вход по ${c.pin?'PIN-коду':'паролю'} включён`+(c.bio?', отпечаток или лицо тоже':''):'Защита выключена — приложение открывается без пароля.';
+      q('.zcur').classList.toggle('hidden',!on);q('.zl1').textContent=on?'Новый пароль или PIN (если хотите сменить)':'Новый пароль или PIN (от 4 символов)';q('.zoff').classList.toggle('hidden',!on);
+      const av=await bioAvailable();q('.zbio').classList.toggle('hidden',!on||!av);q('.zb').checked=!!(c&&c.bio);
+      const af=c&&c.after!==undefined?c.after:5;q('.zaf').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.a===af));q('.zaf').style.opacity=on?1:.4;};
+    const curOk=async()=>{const c=lockCfg();if(!c||!c.hash)return true;if(await pwHash(q('.zp0').value,c.salt,c.iter)===c.hash)return true;msg('Текущий пароль неверный');return false;};
+    q('.zsv').onclick=async()=>{const a=q('.zp1').value,b=q('.zp2').value;if(a.length<4){msg('Не короче 4 символов');return;}if(a!==b){msg('Пароли не совпадают');return;}
+      if(!await curOk())return;await setPassword(a);['.zp0','.zp1','.zp2'].forEach(c=>q(c).value='');msg('Пароль сохранён');upd();};
+    q('.zoff').onclick=async()=>{if(!await curOk())return;saveLock(null);q('.zp0').value='';msg('Защита отключена');upd();};
+    q('.zb').onchange=async()=>{const c=lockCfg();if(!c)return;if(q('.zb').checked){try{c.bio=await bioRegister();saveLock(c);msg('Отпечаток или лицо подключены');}catch(e){q('.zb').checked=false;msg('Не удалось подключить: '+(e&&e.name==='NotAllowedError'?'отменено':e&&e.message||e));}}else{delete c.bio;saveLock(c);msg('Вход отпечатком отключён');}upd();};
+    q('.zaf').querySelectorAll('button').forEach(b=>b.onclick=()=>{const c=lockCfg();if(!c)return;c.after=+b.dataset.a;saveLock(c);upd();});
+    upd();}
   const ck=(cls,key,def)=>{const el=box.querySelector(cls);el.checked=settings[key]===undefined?def:!!settings[key];el.onchange=()=>{settings[key]=el.checked;saveSettings();};};
   {const bs=box.querySelectorAll('.orth button'),cur=()=>settings.ortho===false?0:Math.min(4,settings.orthoDeg||2),mk=()=>bs.forEach(b=>b.classList.toggle('on',+b.dataset.o===cur()));mk();
     bs.forEach(b=>b.onclick=()=>{const v=+b.dataset.o;settings.ortho=v>0;if(v)settings.orthoDeg=v;saveSettings();mk();});}
@@ -2322,6 +2352,46 @@ async function syncOnce(cfg){
   await dbPutMany(items);if(localDel.length){await dbDelMany(localDel);gcFiles();}
   folders=merged;folderTomb=tomb;purged={};syncState={known,lastSync:Date.now()};await dbPut('meta',{key:'sync',value:syncState});
   return {up,down,del,conf,fChanged};}
+
+/* ---------- защита: пароль / PIN и отпечаток (WebAuthn) ---------- */
+// Закрывает экран приложения. Хранится в localStorage (ключ только этого приложения): соль и хэш PBKDF2, id ключа отпечатка.
+const LOCK_KEY='razmery.lock';
+function lockCfg(){try{const c=JSON.parse(localStorage.getItem(LOCK_KEY)||'null');return c&&c.hash?c:null;}catch(e){return null;}}
+function saveLock(c){try{if(c)localStorage.setItem(LOCK_KEY,JSON.stringify(c));else localStorage.removeItem(LOCK_KEY);}catch(e){}}
+const b64=u=>btoa(String.fromCharCode(...new Uint8Array(u))),ub64=t=>Uint8Array.from(atob(t),ch=>ch.charCodeAt(0));
+async function pwHash(pw,salt,iter){const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']);
+  return b64(await crypto.subtle.deriveBits({name:'PBKDF2',salt:ub64(salt),iterations:iter,hash:'SHA-256'},k,256));}
+async function setPassword(pw){const salt=b64(crypto.getRandomValues(new Uint8Array(16))),iter=150000,c=lockCfg()||{after:5};
+  Object.assign(c,{v:1,salt,iter,hash:await pwHash(pw,salt,iter),pin:/^\d+$/.test(pw)});saveLock(c);}
+async function bioAvailable(){try{return !!(window.PublicKeyCredential&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());}catch(e){return false;}}
+async function bioRegister(){const cr=await navigator.credentials.create({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rp:{name:'Размеры на фото',id:location.hostname},
+  user:{id:crypto.getRandomValues(new Uint8Array(16)),name:'razmery',displayName:'Размеры на фото'},pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+  authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'discouraged'},timeout:60000,attestation:'none'}});return b64(cr.rawId);}
+async function bioCheck(id){const r=await navigator.credentials.get({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rpId:location.hostname,
+  allowCredentials:[{type:'public-key',id:ub64(id),transports:['internal']}],userVerification:'required',timeout:60000}});return !!r;}
+let appLocked=false,hiddenAt=0,lockTries=0,lockUntil=0;
+function showLock(){const c=lockCfg();if(!c||appLocked)return;appLocked=true;const el=$('#lockScr');el.classList.remove('hidden');
+  el.innerHTML=`<div class="lk"><img src="icon-192.png" width="72" height="72" alt=""><h2>Размеры на фото</h2>
+  <input type="password" class="inp lkp" placeholder="${c.pin?'PIN-код':'Пароль'}" ${c.pin?'inputmode="numeric"':''} autocomplete="current-password" enterkeyhint="go">
+  <button class="btn pri lkg">Войти</button>${c.bio?'<button class="btn ghost lkb">Отпечаток или лицо</button>':''}<p class="lkm"></p><button class="lkf">Забыли пароль?</button></div>`;
+  const q=x=>el.querySelector(x),p=q('.lkp'),msg=t=>q('.lkm').textContent=t;
+  const go=async()=>{const w=lockUntil-Date.now();if(w>0){msg(`Подождите ${Math.ceil(w/1000)} с`);return;}
+    if(await pwHash(p.value,c.salt,c.iter)===c.hash){unlock();return;}p.value='';lockTries++;
+    if(lockTries>=5){lockTries=0;lockUntil=Date.now()+30000;msg('5 неверных попыток — подождите 30 с');}else msg('Неверно');};
+  q('.lkg').onclick=go;p.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();go();}});
+  const bio=async()=>{try{if(await bioCheck(c.bio))unlock();}catch(e){msg('Не получилось — введите '+(c.pin?'PIN-код':'пароль'));p.focus();}};
+  if(c.bio){q('.lkb').onclick=bio;setTimeout(bio,250);}else setTimeout(()=>p.focus(),100);
+  q('.lkf').onclick=()=>{q('.lk').innerHTML=`<h2>Пароль не восстанавливается</h2><p class="lkr">Можно удалить все проекты «Размеров на фото» на этом устройстве и снять защиту. Другие приложения не затрагиваются.
+    Потом проекты вернутся синхронизацией с GitHub (⟳) или из резервной копии.</p><input class="inp lkd" placeholder="напишите УДАЛИТЬ" autocomplete="off">
+    <button class="btn lkx" style="background:#c62828;color:#fff">Удалить проекты и снять защиту</button><button class="btn ghost lkc">Назад</button>`;
+    el.querySelector('.lkc').onclick=()=>{appLocked=false;showLock();};
+    el.querySelector('.lkx').onclick=async()=>{if(el.querySelector('.lkd').value.trim().toUpperCase()!=='УДАЛИТЬ')return;
+      try{db&&db.close();}catch(e){}saveLock(null);await new Promise(r=>{const d=indexedDB.deleteDatabase('razmery_na_foto');d.onsuccess=d.onerror=d.onblocked=()=>r();});location.reload();};};}
+function unlock(){appLocked=false;lockTries=0;const el=$('#lockScr');el.classList.add('hidden');el.innerHTML='';}
+document.addEventListener('visibilitychange',()=>{const c=lockCfg();if(!c)return;
+  if(document.visibilityState==='hidden'){hiddenAt=Date.now();if(c.after===0)showLock();}
+  else if(c.after>0&&hiddenAt&&Date.now()-hiddenAt>=c.after*60000)showLock();});
+showLock();
 
 /* ---------- запуск ---------- */
 (async()=>{
