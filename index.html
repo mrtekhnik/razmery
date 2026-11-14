@@ -299,7 +299,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.44',APP_DATE='14.11.2026';
+const APP_VERSION='1.45',APP_DATE='14.11.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={rect:'M4 6h16v12H4z',brush:'M18 3l3 3-9 9-3-3 9-9zM9 15c-3 0-5 2-5 6 3 0 6-1 6-4',back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -1169,7 +1169,7 @@ function renderStitch(items,o,scale=1){const L=stitchLayout(items,o),c=document.
   const x=c.getContext('2d');x.fillStyle=o.bg;x.fillRect(0,0,c.width,c.height);x.imageSmoothingQuality='high';x.scale(scale,scale);
   items.forEach((it,j)=>{const P=L.parts[j];x.drawImage(it.im,P.x,P.y,P.w,P.h);if(o.marks&&it.dims){x.save();x.translate(P.x,P.y);x.scale(P.k,P.k);blurBaseW=it.w;for(const d of it.dims)drawObj(x,d,it.im);blurBaseW=0;x.restore();};});
   return {c,L};}
-async function stitchDialog(items,fromProjects){
+async function stitchDialog(items,fromProjects,so={}){
   const o={...settings.stitch,marks:fromProjects};let prevUrl=null,res=null;
   const r=await modal((box,close)=>{
     box.innerHTML=`<h3>Склейка (${items.length})</h3>
@@ -1218,9 +1218,9 @@ async function stitchDialog(items,fromProjects){
   try{const {c,L}=renderStitch(items,{...o,marks:false},1);const blob=await toBlob(c,'image/jpeg',0.92);c.width=c.height=0;
     const objs=o.marks?items.flatMap((it,j)=>(it.dims||[]).map(d=>xformObj(d,L.parts[j].k,L.parts[j].x,L.parts[j].y))):[];
     const im=await loadImg(blob),now=Date.now(),id=uid();
-    const p={id,name:('Склейка: '+items.map(i=>i.name).join(' + ')).slice(0,120),created:now,modified:now,w:im.naturalWidth,h:im.naturalHeight,dims:objs,folderId:curFolder};
+    const p={id,name:(so.name||('Склейка: '+items.map(i=>i.name).join(' + '))).slice(0,120),created:now,modified:now,w:im.naturalWidth,h:im.naturalHeight,dims:objs,folderId:so.folderId!==undefined?so.folderId:curFolder};
     p.thumb=await makeThumb(im,p,objs);const preview=await makePreview(im,p.w,p.h);URL.revokeObjectURL(im.src);
-    await dbPutMany([['projects',p],['photos',{id,blob,preview}]]);busy(false);selMode=false;selProj.clear();openEditor(id);}
+    await dbPutMany([['projects',p],['photos',{id,blob,preview}]]);busy(false);selMode=false;selProj.clear();if(so.inEditor){await flushAll();await openEditor(id,true);toast('Склейка — отдельный новый проект, листы остались как были');}else openEditor(id);}
   catch(e){busy(false);alertBox('Ошибка','Не удалось склеить: не хватает памяти. Попробуйте меньше изображений.');}}
 async function massStitch(){const L=selRecs();if(L.length<2||L.length>9){toast('Для склейки выберите от 2 до 9 проектов');return;}
   busy(true,'Подготовка…');const items=[];
@@ -1229,12 +1229,20 @@ async function massStitch(){const L=selRecs();if(L.length<2||L.length>9){toast('
   busy(false);try{await stitchDialog(items,true);}finally{freeItems(items);}}
 function freeItems(items){items.forEach(i=>{URL.revokeObjectURL(i.im.src);(i.keep||[]).forEach(k=>URL.revokeObjectURL(k.src));});}
 $('#btnStitch').onclick=()=>$('#fStitch').click();
-$('#fStitch').onchange=async e=>{const fs=[...e.target.files];e.target.value='';if(!fs.length)return;
+$('#fStitch').onchange=e=>{const fs=[...e.target.files];e.target.value='';if(fs.length)stitchFiles(fs);};
+async function stitchFiles(fs){
   if(fs.length<2||fs.length>9){alertBox('Склейка фото','Выберите от 2 до 9 изображений (удерживайте палец на фото в галерее, чтобы выбрать несколько).');return;}
   busy(true,'Загрузка…');const items=[];
   try{for(const f of fs){const im=await loadImg(f);items.push({im,w:im.naturalWidth,h:im.naturalHeight,name:f.name.replace(/\.[^.]+$/,'')});}}
   catch(e){busy(false);items.forEach(i=>URL.revokeObjectURL(i.im.src));alertBox('Ошибка','Не удалось открыть одно из изображений.');return;}
-  busy(false);try{await stitchDialog(items,false);}finally{freeItems(items);}};
+  busy(false);try{await stitchDialog(items,false);}finally{freeItems(items);}}
+// склеить листы открытого проекта в одно фото (новый проект)
+async function stitchSheetsHere(){if(!proj||!sheetIds||sheetIds.length<2)return;
+  if(sheetIds.length>9){alertBox('Склейка листов','Склеить можно до 9 листов, а в проекте '+sheetIds.length+'. Удалите лишние листы или склейте части через «Выбрать» на главном экране.');return;}
+  await flushAll();busy(true,'Подготовка…');const items=[];
+  try{for(const id of sheetIds){const p=await dbGet('projects',id),ph=await dbGet('photos',id);if(!p||!ph)continue;const im=await baseImage(p,ph);items.push({im,w:im.naturalWidth,h:im.naturalHeight,dims:p.dims||[],name:p.name});}}
+  catch(e){busy(false);freeItems(items);toast('Не удалось загрузить листы');return;}
+  busy(false);try{await stitchDialog(items,true,{name:(proj.grp?proj.grp.name:proj.name)+' (склейка)',folderId:proj.folderId||null,inEditor:true});}finally{freeItems(items);}}
 async function massExport(){const L=selRecs();if(!L.length)return;
   const fmt=await modal((box,close)=>{let f='jpg';
     box.innerHTML=`<h3>Экспорт</h3><p class="txt">Проектов: ${L.length}</p><div class="seg"><button data-f="jpg" class="on">JPG</button><button data-f="png">PNG</button><button data-f="pdf">PDF-отчёт</button></div><div class="szw">${SIZE_SEG}</div>${PDF_SEG}
@@ -1275,7 +1283,8 @@ async function addSheets(files,grp,start,folderId){const ids=[];
     const id=await newProject(files[i],{quiet:true,name:`${grp.name} — ${start+i+1}`,grp:{id:grp.id,name:grp.name,n:start+i},folderId});if(id)ids.push(id);}
   busy(false);return ids;}
 async function addImages(ims,how){
-  const k=await choose(`Фото: ${ims.length}`,'Как добавить?',[{k:'grp',l:'Одним проектом — листами'},{k:'sep',l:'Отдельными проектами'}]);if(!k)return;
+  const k=await choose(`Фото: ${ims.length}`,'Как добавить?',[{k:'grp',l:'Одним проектом — листами'},{k:'st',l:'Склеить в одно фото'},{k:'sep',l:'Отдельными проектами'}]);if(!k)return;
+  if(k==='st'){if(proj&&!await leaveEditor())return;return stitchFiles(ims);}
   if(k==='sep'){let ok=0;for(let i=0;i<ims.length;i++){busy(true,`Добавление фото ${i+1} из ${ims.length}…`);
       if(await newProject(ims[i],{quiet:true,name:(ims[i].name||'').replace(/\.[^.]+$/,'')||undefined}))ok++;}
     busy(false);await renderList();toast(`Добавлено проектов: ${ok}`+(ok<ims.length?` · не открылось: ${ims.length-ok}`:''));return;}
@@ -1492,8 +1501,8 @@ $('#ctxBar').addEventListener('click',barClick);$('#subBar').addEventListener('c
 $('#tStyle').onclick=()=>openSettings();
 $('#edExport').onclick=()=>{closeStyle();openExport();};
 $('#edTitle').onclick=async()=>{if(!proj)return;const many=sheetIds&&sheetIds.length>1;
-  const k=await choose(proj.grp?proj.grp.name:proj.name,'',[{k:'ren',l:'Переименовать'},{k:'add',l:'Добавить фото листами'},...(many?[{k:'del',l:`Удалить этот лист (${sheetIds.indexOf(proj.id)+1} из ${sheetIds.length})`}]:[])]);
-  if(!k||!proj)return;if(k==='add'){$('#fSheets').click();return;}if(k==='del'){delSheetHere();return;}
+  const k=await choose(proj.grp?proj.grp.name:proj.name,'',[{k:'ren',l:'Переименовать'},{k:'add',l:'Добавить фото листами'},...(many?[{k:'st',l:`Склеить листы в одно фото (${sheetIds.length})`},{k:'del',l:`Удалить этот лист (${sheetIds.indexOf(proj.id)+1} из ${sheetIds.length})`}]:[])]);
+  if(!k||!proj)return;if(k==='add'){$('#fSheets').click();return;}if(k==='st'){stitchSheetsHere();return;}if(k==='del'){delSheetHere();return;}
   const v=await askText('Название',proj.name);if(!v||!proj)return;proj.name=v;changed();};
 $('#zIn').onclick=()=>zoomAt(1.5,cw/2,ch/2);
 $('#zOut').onclick=()=>zoomAt(1/1.5,cw/2,ch/2);
