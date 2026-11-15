@@ -300,7 +300,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const clone=o=>JSON.parse(JSON.stringify(o));
 const fmtDate=t=>new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 const APP_ID='razmery-na-foto';
-const APP_VERSION='1.46',APP_DATE='15.11.2026';
+const APP_VERSION='1.47',APP_DATE='15.11.2026';
 
 /* ---------- иконки ---------- */
 const ICONS={full:'M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7',fullx:'M20 10h-6V4M4 14h6v6M14 10l6-6M10 14l-6 6',rect:'M4 6h16v12H4z',brush:'M18 3l3 3-9 9-3-3 9-9zM9 15c-3 0-5 2-5 6 3 0 6-1 6-4',back:'M15 18l-6-6 6-6',undo:'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4',redo:'M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4',
@@ -2325,10 +2325,17 @@ async function showStorage(){
 /* ---------- «На весь экран» — только когда приложение открыто во вкладке браузера ---------- */
 const inTab=()=>!(matchMedia('(display-mode: standalone)').matches||matchMedia('(display-mode: fullscreen)').matches||matchMedia('(display-mode: minimal-ui)').matches||navigator.standalone);
 const fsOn=()=>!!document.fullscreenElement,fsCan=()=>!!document.fullscreenEnabled&&(inTab()||fsOn());
-async function toggleFull(){try{if(fsOn())await document.exitFullscreen();else await document.documentElement.requestFullscreen({navigationUI:'hide'});}
+async function toggleFull(){try{if(fsOn()){fsWant=false;fsHidden=false;await document.exitFullscreen();}else await document.documentElement.requestFullscreen({navigationUI:'hide'});}
   catch(e){toast('Браузер не разрешил полноэкранный режим');}}
 function updFull(){const b=$('#zFull');if(!b)return;b.classList.toggle('hidden',!fsCan());b.innerHTML=ic(fsOn()?'fullx':'full');b.setAttribute('aria-label',fsOn()?'Выйти из полноэкранного':'На весь экран');}
-document.addEventListener('fullscreenchange',updFull);updFull();
+// если режим выключила система (ушли в другое окно), а не пользователь — вернуть его первым касанием после возврата
+let fsWant=false,fsHidden=false;
+document.addEventListener('fullscreenchange',()=>{updFull();if(fsOn()){fsWant=true;fsHidden=false;}else if(!document.hidden&&!fsHidden)fsWant=false;});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){if(fsWant)fsHidden=true;}else if(fsWant&&!fsOn())armFull();});
+function armFull(){const h=()=>{document.removeEventListener('pointerup',h,true);document.removeEventListener('keydown',h,true);
+    if(fsWant&&!fsOn()&&!document.hidden&&!appLocked)document.documentElement.requestFullscreen({navigationUI:'hide'}).catch(()=>{});};
+  document.addEventListener('pointerup',h,true);document.addEventListener('keydown',h,true);}
+updFull();
 $('#zFull').onclick=toggleFull;
 $('#lsMenu').onclick=async()=>{
   const k=await choose('Меню','',[...(fsCan()?[{k:'fs',l:fsOn()?'Выйти из полноэкранного режима':'На весь экран'}]:[]),{k:'bk',l:'Создать резервную копию'},{k:'rs',l:'Восстановить из резервной копии'},{k:'st',l:'Настройки'},{k:'tr',l:(lastPs.some(p=>p.deleted)?`Корзина (${lastPs.filter(p=>p.deleted).length})`:'Корзина')},{k:'inf',l:'Хранилище'},{k:'sy',l:'Синхронизировать'},{k:'up',l:'Проверить обновления'}],
@@ -2488,7 +2495,7 @@ function showLock(){const c=lockCfg();if(!c||appLocked)return;appLocked=true;con
     el.querySelector('.lkc').onclick=()=>{appLocked=false;showLock();};
     el.querySelector('.lkx').onclick=async()=>{if(el.querySelector('.lkd').value.trim().toUpperCase()!=='УДАЛИТЬ')return;
       try{db&&db.close();}catch(e){}saveLock(null);await new Promise(r=>{const d=indexedDB.deleteDatabase('razmery_na_foto');d.onsuccess=d.onerror=d.onblocked=()=>r();});location.reload();};};}
-function unlock(){appLocked=false;lockTries=0;const el=$('#lockScr');el.classList.add('hidden');el.innerHTML='';}
+function unlock(){appLocked=false;lockTries=0;if(typeof fsWant!=='undefined'&&fsWant&&!fsOn())armFull();const el=$('#lockScr');el.classList.add('hidden');el.innerHTML='';}
 document.addEventListener('visibilitychange',()=>{const c=lockCfg();if(!c)return;
   if(document.visibilityState==='hidden'){hiddenAt=Date.now();if(c.after===0)showLock();}
   else if(c.after>0&&hiddenAt&&Date.now()-hiddenAt>=c.after*60000)showLock();});
